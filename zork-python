@@ -1,0 +1,25 @@
+#!/bin/bash
+# Zork I - Python Edition
+# Wrapper script to run the Python translation of Zork
+
+# Get the directory where this script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Path to the Python script
+ZORK_PY="$SCRIPT_DIR/zork.py"
+
+# Check if Python 3 is available
+if ! command -v python3 &> /dev/null; then
+    echo "Error: Python 3 is not installed."
+    echo "Please install Python 3 to run this game."
+    exit 1
+fi
+
+# Check if the Python script exists
+if [ ! -f "$ZORK_PY" ]; then
+    echo "Error: zork.py not found at $ZORK_PY"
+    exit 1
+fi
+
+# Run the game
+exec python3 "$ZORK_PY" "$@"
