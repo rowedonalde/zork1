@@ -512,6 +512,532 @@ class DropAction(BaseAction):
             print("Dropped.")
 
 
+class SingleObjectAction(BaseAction):
+    """Base class for actions that operate on a single object
+
+    Examples: examine, climb, move, read
+
+    Subclasses should implement:
+    - from_command() - Parse command into direct_object
+    - effect() - Define what happens when action succeeds
+    - validate_direct_object() - Optional: add custom validation
+    """
+
+    def __init__(self, game: 'ZorkGame', direct_object: Optional[str],
+                 require_object: bool = True, allow_missing: bool = False):
+        """
+        Args:
+            game: The game instance
+            direct_object: The object to act upon
+            require_object: If True, prints error if no object specified
+            allow_missing: If True, allows object to not exist (for fallback behavior)
+        """
+        super().__init__(game, direct_object)
+        self.require_object = require_object
+        self.allow_missing = allow_missing
+
+    def validate_direct_object(self) -> bool:
+        """Standard validation for single-object actions"""
+        if not self.direct_object:
+            if self.require_object:
+                # Subclass should override to provide specific message
+                print(f"{self.__class__.__name__} what?")
+                return False
+            return True  # Some actions have default behavior when no object
+
+        item = self.game.find_item(self.direct_object)
+        if not item:
+            if self.allow_missing:
+                return True  # Subclass will handle missing object
+            print(f"You don't see any {self.direct_object} here.")
+            return False
+
+        return True
+
+
+class TwoObjectAction(BaseAction):
+    """Base class for actions with a direct object and indirect object
+
+    Examples: give X to Y, throw X at Y, attack X with Y
+
+    Subclasses should implement:
+    - from_command() - Parse command into direct_object, preposition, indirect_object
+    - effect() - Define what happens when action succeeds
+    - validate_direct_object() - Optional: add custom validation
+    - validate_indirect_object() - Optional: add custom validation
+    """
+
+    def __init__(self, game: 'ZorkGame', direct_object: Optional[str],
+                 preposition: Optional[str], indirect_object: Optional[str],
+                 require_direct: bool = True, require_indirect: bool = False):
+        """
+        Args:
+            game: The game instance
+            direct_object: The primary object (what is acted upon)
+            preposition: The preposition (to, with, at, etc.)
+            indirect_object: The secondary object (target, tool, etc.)
+            require_direct: If True, direct_object must be specified
+            require_indirect: If True, indirect_object must be specified
+        """
+        super().__init__(game, direct_object, preposition, indirect_object)
+        self.require_direct = require_direct
+        self.require_indirect = require_indirect
+
+    def validate_direct_object(self) -> bool:
+        """Standard validation for direct object"""
+        if not self.direct_object:
+            if self.require_direct:
+                print(f"{self.__class__.__name__.replace('Action', '')} what?")
+                return False
+            return True
+
+        item = self.game.find_item(self.direct_object)
+        if not item:
+            print(f"You don't see any {self.direct_object} here.")
+            return False
+
+        return True
+
+    def validate_indirect_object(self) -> bool:
+        """Standard validation for indirect object"""
+        if not self.indirect_object:
+            if self.require_indirect:
+                print(f"{self.__class__.__name__.replace('Action', '')} what {self.preposition} what?")
+                return False
+            return True
+
+        item = self.game.find_item(self.indirect_object)
+        if not item:
+            print(f"You don't see any {self.indirect_object} here.")
+            return False
+
+        return True
+
+
+class ToggleAction(BaseAction):
+    """Base class for paired on/off or open/close actions
+
+    Examples: open/close, lock/unlock, light/extinguish
+
+    Subclasses should implement:
+    - from_command() - Parse command into direct_object and determine state
+    - effect() - Define what happens when toggle succeeds
+    - validate_direct_object() - Check if object can be toggled
+    """
+
+    def __init__(self, game: 'ZorkGame', direct_object: Optional[str],
+                 new_state: bool, state_flag: str):
+        """
+        Args:
+            game: The game instance
+            direct_object: The object to toggle
+            new_state: True for "on"/"open", False for "off"/"close"
+            state_flag: The flag that tracks state (e.g., 'OPENBIT', 'ONBIT')
+        """
+        super().__init__(game, direct_object)
+        self.new_state = new_state
+        self.state_flag = state_flag
+
+    def get_current_state(self, item: Item) -> bool:
+        """Check if item is currently in the target state"""
+        return self.state_flag in item.flags
+
+    def set_state(self, item: Item, state: bool):
+        """Set the item's state"""
+        if state:
+            item.flags.add(self.state_flag)
+        else:
+            item.flags.discard(self.state_flag)
+
+
+class ExamineAction(SingleObjectAction):
+    """Action to examine an object"""
+
+    def __init__(self, game: 'ZorkGame', direct_object: Optional[str]):
+        # Allow missing object (will default to look command)
+        super().__init__(game, direct_object, require_object=False, allow_missing=True)
+
+    @staticmethod
+    def from_command(command: str, game: 'ZorkGame') -> 'ExamineAction':
+        """Factory method to create ExamineAction from command"""
+        tokens = command.split()
+        direct_object = ' '.join(tokens[1:]) if len(tokens) > 1 else None
+        return ExamineAction(game, direct_object)
+
+    def validate_direct_object(self) -> bool:
+        """Validate object - but allow missing for fallback to look"""
+        if not self.direct_object:
+            return True  # Will trigger look command in effect()
+
+        # For examine, we allow objects not found (special cases handled in effect)
+        return True
+
+    def effect(self):
+        """Examine the object or look around"""
+        if not self.direct_object:
+            # No object specified - default to look
+            self.game.do_look()
+            return
+
+        item = self.game.find_item(self.direct_object)
+        if not item:
+            print(f"You don't see any {self.direct_object} here.")
+            return
+
+        # Special descriptions
+        if item.name == 'leaflet':
+            print("\"WELCOME TO ZORK!")
+            print()
+            print("ZORK is a game of adventure, danger, and low cunning. In it you will")
+            print("explore some of the most amazing territory ever seen by mortals. No")
+            print("computer should be without one!\"")
+        elif item.name == 'mailbox':
+            if 'leaflet' in [i.name for i in self.game.items.values() if i.location == 'mailbox']:
+                print("The small mailbox is closed.")
+                print("The leaflet is inside.")
+            else:
+                print("The small mailbox is empty.")
+        else:
+            print(f"You see nothing special about the {item.desc}.")
+
+
+class GiveAction(TwoObjectAction):
+    """Action to give an item to an NPC"""
+
+    def __init__(self, game: 'ZorkGame', direct_object: Optional[str],
+                 preposition: Optional[str], indirect_object: Optional[str]):
+        super().__init__(game, direct_object, preposition, indirect_object,
+                        require_direct=True, require_indirect=True)
+
+    @staticmethod
+    def from_command(command: str, game: 'ZorkGame') -> 'GiveAction':
+        """Factory method to create GiveAction from command"""
+        tokens = command.split()
+
+        if 'to' in tokens:
+            to_idx = tokens.index('to')
+            direct_object = ' '.join(tokens[1:to_idx])
+            preposition = 'to'
+            indirect_object = ' '.join(tokens[to_idx+1:])
+        else:
+            # Fallback parsing
+            direct_object = tokens[1] if len(tokens) > 1 else None
+            preposition = None
+            indirect_object = tokens[2] if len(tokens) > 2 else None
+
+        return GiveAction(game, direct_object, preposition, indirect_object)
+
+    def validate_direct_object(self) -> bool:
+        """Validate item exists and is in inventory"""
+        if not self.direct_object:
+            print("Give what to whom?")
+            return False
+
+        item = self.game.find_item(self.direct_object)
+        if not item:
+            print(f"You don't have any {self.direct_object}.")
+            return False
+
+        if not self.game.state.has_item(item.name):
+            print(f"You aren't holding the {item.desc}.")
+            return False
+
+        return True
+
+    def validate_indirect_object(self) -> bool:
+        """Validate target exists and is an actor"""
+        if not self.indirect_object:
+            print("Give what to whom?")
+            return False
+
+        target = self.game.find_item(self.indirect_object)
+        if not target:
+            print(f"You don't see any {self.indirect_object} here.")
+            return False
+
+        if 'ACTORBIT' not in target.flags:
+            item = self.game.find_item(self.direct_object)
+            print(f"You can't give a {item.desc} to a {target.desc}!")
+            return False
+
+        return True
+
+    def effect(self):
+        """Give the item to the NPC"""
+        item = self.game.find_item(self.direct_object)
+        target = self.game.find_item(self.indirect_object)
+
+        # Default behavior - NPC refuses (can be overridden for specific NPCs later)
+        print(f"The {target.desc} refuses it politely.")
+
+
+class AttackAction(TwoObjectAction):
+    """Action to attack an NPC with a weapon"""
+
+    def __init__(self, game: 'ZorkGame', direct_object: Optional[str],
+                 preposition: Optional[str], indirect_object: Optional[str]):
+        super().__init__(game, direct_object, preposition, indirect_object,
+                        require_direct=True, require_indirect=False)
+
+    @staticmethod
+    def from_command(command: str, game: 'ZorkGame') -> 'AttackAction':
+        """Factory method to create AttackAction from command"""
+        tokens = command.split()
+
+        if 'with' in tokens:
+            with_idx = tokens.index('with')
+            direct_object = ' '.join(tokens[1:with_idx])
+            preposition = 'with'
+            indirect_object = ' '.join(tokens[with_idx+1:])
+        else:
+            # Just "attack troll" without weapon
+            direct_object = ' '.join(tokens[1:]) if len(tokens) > 1 else None
+            preposition = None
+            indirect_object = None
+
+        return AttackAction(game, direct_object, preposition, indirect_object)
+
+    def validate_direct_object(self) -> bool:
+        """Validate target exists and is attackable"""
+        if not self.direct_object:
+            print("Attack what?")
+            return False
+
+        target = self.game.find_item(self.direct_object)
+        if not target:
+            print(f"You don't see any {self.direct_object} here.")
+            return False
+
+        if 'ACTORBIT' not in target.flags:
+            print(f"You can't attack the {target.desc}.")
+            return False
+
+        return True
+
+    def validate_indirect_object(self) -> bool:
+        """Validate weapon if specified"""
+        if not self.indirect_object:
+            return True  # Weapon is optional (validated in effect)
+
+        weapon = self.game.find_item(self.indirect_object)
+        if not weapon:
+            print(f"You don't have any {self.indirect_object}.")
+            return False
+
+        if not self.game.state.has_item(weapon.name):
+            print(f"You aren't holding the {weapon.desc}.")
+            return False
+
+        if 'WEAPONBIT' not in weapon.flags:
+            print(f"The {weapon.desc} isn't much of a weapon.")
+            return False
+
+        return True
+
+    def effect(self):
+        """Perform the attack"""
+        import random
+
+        target = self.game.find_item(self.direct_object)
+        weapon = self.game.find_item(self.indirect_object) if self.indirect_object else None
+
+        # Handle troll specifically
+        if target.name == 'troll':
+            if not weapon:
+                print("With what? Your bare hands?")
+                return
+
+            # Simple combat - 50% chance of killing troll
+            if random.random() < 0.5:
+                print(f"You swing the {weapon.desc} at the troll.")
+                print("The troll is struck by your blow and falls dead!")
+                print("The troll's body dissolves into a cloud of greasy black smoke.")
+
+                # Remove troll
+                room = self.game.get_current_room()
+                if target.name in room.items:
+                    room.items.remove(target.name)
+
+                # Set troll flag to open passages
+                self.game.state.flags['troll_flag'] = True
+
+                # Drop the axe
+                room.items.append('axe')
+                if 'axe' not in self.game.items:
+                    self.game.items['axe'] = Item(
+                        name='axe',
+                        desc='bloody axe',
+                        synonyms=['weapon'],
+                        adjectives=['bloody'],
+                        location=room.name,
+                        takeable=True,
+                        flags={'TAKEBIT', 'WEAPONBIT'},
+                        size=25
+                    )
+                else:
+                    self.game.items['axe'].location = room.name
+            else:
+                print(f"You swing the {weapon.desc} at the troll.")
+                print("The troll deftly parries your blow and grins menacingly.")
+                print("The troll doesn't look amused.")
+        else:
+            print(f"You can't attack the {target.desc}.")
+
+
+class ThrowAction(TwoObjectAction):
+    """Action to throw an item at a target"""
+
+    def __init__(self, game: 'ZorkGame', direct_object: Optional[str],
+                 preposition: Optional[str], indirect_object: Optional[str]):
+        super().__init__(game, direct_object, preposition, indirect_object,
+                        require_direct=True, require_indirect=False)
+
+    @staticmethod
+    def from_command(command: str, game: 'ZorkGame') -> 'ThrowAction':
+        """Factory method to create ThrowAction from command"""
+        tokens = command.split()
+
+        if 'at' in tokens:
+            at_idx = tokens.index('at')
+            direct_object = ' '.join(tokens[1:at_idx])
+            preposition = 'at'
+            indirect_object = ' '.join(tokens[at_idx+1:])
+        else:
+            # Just "throw sword" without target
+            direct_object = ' '.join(tokens[1:]) if len(tokens) > 1 else None
+            preposition = None
+            indirect_object = None
+
+        return ThrowAction(game, direct_object, preposition, indirect_object)
+
+    def validate_direct_object(self) -> bool:
+        """Validate item exists and is in inventory"""
+        if not self.direct_object:
+            print("Throw what?")
+            return False
+
+        item = self.game.find_item(self.direct_object)
+        if not item:
+            print(f"You don't have any {self.direct_object}.")
+            return False
+
+        if not self.game.state.has_item(item.name):
+            print(f"You aren't holding the {item.desc}.")
+            return False
+
+        return True
+
+    def validate_indirect_object(self) -> bool:
+        """Validate target if specified"""
+        if not self.indirect_object:
+            return True  # Target is optional
+
+        target = self.game.find_item(self.indirect_object)
+        if not target:
+            print(f"You don't see any {self.indirect_object} here.")
+            return False
+
+        return True
+
+    def effect(self):
+        """Throw the item"""
+        item = self.game.find_item(self.direct_object)
+
+        if self.indirect_object:
+            # Throwing at target
+            target = self.game.find_item(self.indirect_object)
+            print(f"You throw the {item.desc} at the {target.desc}.")
+            print("It bounces harmlessly off.")
+        else:
+            # Just throwing (no target)
+            print("Thrown.")
+
+        # Drop the item either way
+        self.game.state.remove_item(item.name)
+        room = self.game.get_current_room()
+        room.items.append(item.name)
+        item.location = room.name
+
+
+class ClimbAction(SingleObjectAction):
+    """Action to climb an object"""
+
+    def __init__(self, game: 'ZorkGame', direct_object: Optional[str]):
+        super().__init__(game, direct_object, require_object=True, allow_missing=False)
+
+    @staticmethod
+    def from_command(command: str, game: 'ZorkGame') -> 'ClimbAction':
+        """Factory method to create ClimbAction from command"""
+        tokens = command.split()
+        direct_object = ' '.join(tokens[1:]) if len(tokens) > 1 else None
+        return ClimbAction(game, direct_object)
+
+    def validate_direct_object(self) -> bool:
+        """Validate object exists"""
+        if not self.direct_object:
+            print("Climb what?")
+            return False
+
+        item = self.game.find_item(self.direct_object)
+        if not item:
+            print(f"You don't see any {self.direct_object} here.")
+            return False
+
+        return True
+
+    def effect(self):
+        """Climb the object"""
+        item = self.game.find_item(self.direct_object)
+
+        # Special case for tree in forest path
+        if item.name == 'tree' and self.game.state.current_room == 'path':
+            self.game.state.current_room = 'up_a_tree'
+            self.game.state.moves += 1
+            self.game.do_look()
+        else:
+            print(f"You can't climb the {item.desc}.")
+
+
+class MoveAction(SingleObjectAction):
+    """Action to move/push an object"""
+
+    def __init__(self, game: 'ZorkGame', direct_object: Optional[str]):
+        super().__init__(game, direct_object, require_object=True, allow_missing=False)
+
+    @staticmethod
+    def from_command(command: str, game: 'ZorkGame') -> 'MoveAction':
+        """Factory method to create MoveAction from command"""
+        tokens = command.split()
+        direct_object = ' '.join(tokens[1:]) if len(tokens) > 1 else None
+        return MoveAction(game, direct_object)
+
+    def validate_direct_object(self) -> bool:
+        """Validate object exists"""
+        if not self.direct_object:
+            print("Move what?")
+            return False
+
+        item = self.game.find_item(self.direct_object)
+        if not item:
+            print(f"You don't see any {self.direct_object} here.")
+            return False
+
+        return True
+
+    def effect(self):
+        """Move the object"""
+        item = self.game.find_item(self.direct_object)
+
+        # Special case for rug - reveals trap door
+        if item.name == 'rug':
+            print("With a great effort, the rug is moved to one side of the room, revealing the dusty cover of a closed trap door.")
+            trap_door = self.game.items.get('trap_door')
+            if trap_door:
+                trap_door.flags.discard('NDESCBIT')
+        else:
+            print(f"You can't move the {item.desc}.")
+
+
 class ZorkGame:
     """Main game engine"""
 
@@ -1129,31 +1655,8 @@ class ZorkGame:
 
     def do_examine(self, obj_name: str, _=None):
         """Examine an item"""
-        if not obj_name:
-            self.do_look()
-            return
-
-        item = self.find_item(obj_name)
-
-        if not item:
-            print(f"I don't see any {obj_name} here.")
-            return
-
-        # Special descriptions
-        if item.name == 'leaflet':
-            print("\"WELCOME TO ZORK!")
-            print()
-            print("ZORK is a game of adventure, danger, and low cunning. In it you will")
-            print("explore some of the most amazing territory ever seen by mortals. No")
-            print("computer should be without one!\"")
-        elif item.name == 'mailbox':
-            if 'leaflet' in [i.name for i in self.items.values() if i.location == 'mailbox']:
-                print("The small mailbox is closed.")
-                print("The leaflet is inside.")
-            else:
-                print("The small mailbox is empty.")
-        else:
-            print(f"You see nothing special about the {item.desc}.")
+        action = ExamineAction(self, obj_name)
+        action()
 
     def do_open(self, obj_name: str, _=None):
         """Open an object"""
@@ -1206,24 +1709,8 @@ class ZorkGame:
 
     def do_move(self, obj_name: str, _=None):
         """Move an object"""
-        if not obj_name:
-            print("Move what?")
-            return
-
-        item = self.find_item(obj_name)
-
-        if not item:
-            print(f"I don't see any {obj_name} here.")
-            return
-
-        if item.name == 'rug':
-            print("With a great effort, the rug is moved to one side of the room, revealing the dusty cover of a closed trap door.")
-            # Make trap door visible now by removing NDESCBIT
-            trap_door = self.items.get('trap_door')
-            if trap_door:
-                trap_door.flags.discard('NDESCBIT')
-        else:
-            print(f"You can't move the {item.desc}.")
+        action = MoveAction(self, obj_name)
+        action()
 
     def do_turn_on(self, obj_name: str, _=None):
         """Turn on a light source"""
@@ -1293,77 +1780,8 @@ class ZorkGame:
 
     def do_attack(self, target_name: str, weapon_name: str):
         """Attack an NPC with a weapon"""
-        if not target_name:
-            print("Attack what?")
-            return
-
-        # Find the target
-        target = self.find_item(target_name)
-        if not target:
-            print(f"You don't see any {target_name} here.")
-            return
-
-        # Must be an actor
-        if 'ACTORBIT' not in target.flags:
-            print(f"You can't attack the {target.desc}.")
-            return
-
-        # Find weapon (if specified)
-        weapon = None
-        if weapon_name:
-            weapon = self.find_item(weapon_name)
-            if not weapon:
-                print(f"You don't have any {weapon_name}.")
-                return
-            if not self.state.has_item(weapon.name):
-                print(f"You aren't holding the {weapon.desc}.")
-                return
-            if 'WEAPONBIT' not in weapon.flags:
-                print(f"The {weapon.desc} isn't much of a weapon.")
-                return
-
-        # Handle troll specifically
-        if target.name == 'troll':
-            if not weapon:
-                print("With what? Your bare hands?")
-                return
-
-            # Simple combat - 50% chance of killing troll
-            import random
-            if random.random() < 0.5:
-                print(f"You swing the {weapon.desc} at the troll.")
-                print("The troll is struck by your blow and falls dead!")
-                print("The troll's body dissolves into a cloud of greasy black smoke.")
-
-                # Remove troll
-                room = self.get_current_room()
-                if target.name in room.items:
-                    room.items.remove(target.name)
-
-                # Set troll flag to open passages
-                self.state.flags['troll_flag'] = True
-
-                # Drop the axe
-                room.items.append('axe')
-                if 'axe' not in self.items:
-                    self.items['axe'] = Item(
-                        name='axe',
-                        desc='bloody axe',
-                        synonyms=['weapon'],
-                        adjectives=['bloody'],
-                        location=room.name,
-                        takeable=True,
-                        flags={'TAKEBIT', 'WEAPONBIT'},
-                        size=25
-                    )
-                else:
-                    self.items['axe'].location = room.name
-            else:
-                print(f"You swing the {weapon.desc} at the troll.")
-                print("The troll deftly parries your blow and grins menacingly.")
-                print("The troll doesn't look amused.")
-        else:
-            print(f"You can't attack the {target.desc}.")
+        action = AttackAction(self, target_name, 'with', weapon_name)
+        action()
 
     def do_debug(self, _=None, __=None):
         """Show debug information about game state"""
@@ -1473,85 +1891,18 @@ class ZorkGame:
 
     def do_give(self, obj_name: str, target_name: str):
         """Give an item to an NPC"""
-        if not obj_name or not target_name:
-            print("Give what to whom?")
-            return
-
-        # Find the item to give
-        item = self.find_item(obj_name)
-        if not item:
-            print(f"You don't have any {obj_name}.")
-            return
-
-        if not self.state.has_item(item.name):
-            print(f"You aren't holding the {item.desc}.")
-            return
-
-        # Find the target
-        target = self.find_item(target_name)
-        if not target:
-            print(f"You don't see any {target_name} here.")
-            return
-
-        # Check if target is an actor
-        if 'ACTORBIT' not in target.flags:
-            print(f"You can't give a {item.desc} to a {target.desc}!")
-            return
-
-        # Default behavior - NPC refuses (can be overridden for specific NPCs later)
-        print(f"The {target.desc} refuses it politely.")
+        action = GiveAction(self, obj_name, 'to', target_name)
+        action()
 
     def do_climb(self, obj_name: str, _=None):
         """Climb something"""
-        if not obj_name:
-            print("Climb what?")
-            return
-
-        item = self.find_item(obj_name)
-        if not item:
-            print(f"You don't see any {obj_name} here.")
-            return
-
-        # Special case for tree in forest path
-        if item.name == 'tree' and self.state.current_room == 'path':
-            self.state.current_room = 'up_a_tree'
-            self.state.moves += 1
-            self.do_look()
-        else:
-            print(f"You can't climb the {item.desc}.")
+        action = ClimbAction(self, obj_name)
+        action()
 
     def do_throw(self, obj_name: str, target_name: str):
         """Throw an item"""
-        if not obj_name:
-            print("Throw what?")
-            return
-
-        # Find the item
-        item = self.find_item(obj_name)
-        if not item:
-            print(f"You don't have any {obj_name}.")
-            return
-
-        if not self.state.has_item(item.name):
-            print(f"You aren't holding the {item.desc}.")
-            return
-
-        # If no target, just drop it
-        if not target_name:
-            print("Thrown.")
-            self.do_drop(obj_name)
-            return
-
-        # Find target
-        target = self.find_item(target_name)
-        if not target:
-            print(f"You don't see any {target_name} here.")
-            return
-
-        # Default behavior - just drop the item
-        print(f"You throw the {item.desc} at the {target.desc}.")
-        print("It bounces harmlessly off.")
-        self.do_drop(obj_name)
+        action = ThrowAction(self, obj_name, 'at', target_name)
+        action()
 
     def do_lock(self, obj_name: str, key_name: str):
         """Lock something with a key"""
