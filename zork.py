@@ -144,6 +144,374 @@ class GameState:
             self.inventory.remove(item_name)
 
 
+@dataclass
+class BaseAction:
+    """Abstract base class for an action that can be performed"""
+    game: 'ZorkGame'
+    direct_object: Optional[str] = None
+    preposition: Optional[str] = None
+    indirect_object: Optional[str] = None
+
+    @staticmethod
+    def from_command(command: str, game: 'ZorkGame') -> 'BaseAction':
+        """
+        Factory method to create action from command string
+
+        `command` is the full user input command, e.g. "take sword from chest".
+
+        Example:
+            def from_command(command: str, game: 'ZorkGame') -> 'SomeAction':
+                tokens = command.split()
+                verb = tokens[0]
+                direct_object = tokens[1] if len(tokens) > 1 else None
+                preposition = tokens[2] if len(tokens) > 2 else None
+                indirect_object = tokens[3] if len(tokens) > 3 else None
+                return SomeAction(game, direct_object, preposition, indirect_object)
+        """
+        raise NotImplementedError
+
+    def validate_direct_object(self) -> bool:
+        """
+        Confirm presence of direct object
+
+        Extend this method for relevance of the direct object to the action:
+            def validate_direct_object(self) -> bool:
+                if not super().validate_direct_object():
+                    return False
+                # Additional validation logic here
+                return True
+        """
+        if not self.direct_object:
+            return True  # No direct object to validate
+        if not self.game.find_item(self.direct_object):
+            print(f"I don't see any {self.direct_object} here.")
+            return False
+        return True
+
+    def validate_indirect_object(self) -> bool:
+        """Confirm presence of indirect object"""
+        if not self.indirect_object:
+            return True  # No indirect object to validate
+        if not self.game.find_item(self.indirect_object):
+            print(f"I don't see any {self.indirect_object} here.")
+            return False
+        return True
+
+    def validate_preposition(self) -> bool:
+        """Confirm preposition is valid for this action"""
+        return True  # Default implementation assumes any preposition is valid
+    
+    def effect(self):
+        """Define side effects of the action"""
+        raise NotImplementedError
+
+    def __call__(self):
+        """Execute the action"""
+        if not self.validate_direct_object():
+            return
+        if not self.validate_indirect_object():
+            return
+        if not self.validate_preposition():
+            return
+        self.effect()
+
+
+class TurnOnOffAction(BaseAction):
+    """Action to turn light sources on or off"""
+
+    def __init__(self, game: 'ZorkGame', direct_object: Optional[str], turn_on: bool):
+        super().__init__(game, direct_object)
+        self.turn_on = turn_on
+
+    @staticmethod
+    def from_command(command: str, game: 'ZorkGame', turn_on: bool) -> 'TurnOnOffAction':
+        """Factory method to create TurnOnOffAction from command
+
+        Args:
+            command: Full command string (e.g., "turn on lantern")
+            game: The game instance
+            turn_on: True for "turn on", False for "turn off"
+        """
+        tokens = command.split()
+        # Handle "turn on lantern" or "light lantern"
+        if len(tokens) >= 3 and tokens[0] == 'turn':
+            # "turn on/off lantern" - object is everything after on/off
+            direct_object = ' '.join(tokens[2:])
+        elif len(tokens) >= 2:
+            # "light lantern" - object is everything after verb
+            direct_object = ' '.join(tokens[1:])
+        else:
+            direct_object = None
+
+        return TurnOnOffAction(game, direct_object, turn_on)
+
+    def validate_direct_object(self) -> bool:
+        """Validate object exists and can be toggled"""
+        if not self.direct_object:
+            print(f"Turn {'on' if self.turn_on else 'off'} what?")
+            return False
+
+        item = self.game.find_item(self.direct_object)
+        if not item:
+            print(f"I don't see any {self.direct_object} here.")
+            return False
+
+        if 'LIGHTBIT' not in item.flags:
+            print(f"You can't turn that {'on' if self.turn_on else 'off'}.")
+            return False
+
+        return True
+
+    def effect(self):
+        """Toggle the light source and update room lighting"""
+        item = self.game.find_item(self.direct_object)
+        is_on = 'ONBIT' in item.flags
+
+        if self.turn_on:
+            if is_on:
+                print("It is already on.")
+                return
+            item.flags.add('ONBIT')
+            print(f"The {item.desc} is now on.")
+        else:
+            if not is_on:
+                print("It is already off.")
+                return
+            item.flags.discard('ONBIT')
+            print(f"The {item.desc} is now off.")
+
+        # Update room lighting and react to light changes
+        was_lit = self.game.state.lit
+        self.game.state.lit = self.game.is_room_lit()
+
+        if not was_lit and self.game.state.lit:
+            # Room just became lit - show description
+            print()
+            self.game.do_look()
+        elif was_lit and not self.game.state.lit:
+            # Room just became dark
+            print("It is now pitch black.")
+
+
+class TakeAction(BaseAction):
+    """Action to take/pick up an item from room or container"""
+
+    @staticmethod
+    def from_command(command: str, game: 'ZorkGame') -> 'TakeAction':
+        """Factory method to create TakeAction from command
+
+        Args:
+            command: Full command string (e.g., "take sword" or "take sword from chest")
+            game: The game instance
+        """
+        tokens = command.split()
+        verb = tokens[0] if tokens else None
+
+        # Check for "take X from Y" pattern
+        if 'from' in tokens:
+            from_idx = tokens.index('from')
+            direct_object = ' '.join(tokens[1:from_idx])
+            preposition = 'from'
+            indirect_object = ' '.join(tokens[from_idx+1:])
+        else:
+            # Simple "take X"
+            direct_object = ' '.join(tokens[1:]) if len(tokens) > 1 else None
+            preposition = None
+            indirect_object = None
+
+        return TakeAction(game, direct_object, preposition, indirect_object)
+
+    def validate_direct_object(self) -> bool:
+        """Validate object exists and can be taken"""
+        if not self.direct_object:
+            if self.indirect_object:
+                print("Take what from what?")
+            else:
+                print("Take what?")
+            return False
+
+        # If taking from container, find item in container
+        if self.indirect_object:
+            # Container validation happens in validate_indirect_object
+            # Here we just check if item exists in the container
+            container = self.game.find_item(self.indirect_object)
+            if not container:
+                return False  # Error already printed in validate_indirect_object
+
+            # Find item in container
+            item = None
+            for item_name, potential_item in self.game.items.items():
+                if potential_item.location == container.name and potential_item.matches(self.direct_object):
+                    item = potential_item
+                    break
+
+            if not item:
+                print(f"There's no {self.direct_object} in the {container.desc}.")
+                return False
+
+            return True
+        else:
+            # Simple take - find item in room or inventory
+            item = self.game.find_item(self.direct_object)
+            if not item:
+                print(f"I don't see any {self.direct_object} here.")
+                return False
+
+            # Check if takeable
+            if not item.takeable and 'TAKEBIT' not in item.flags:
+                print(f"You can't take the {item.desc}.")
+                return False
+
+            # Check if already in inventory
+            if item.name in self.game.state.inventory:
+                print("You already have that.")
+                return False
+
+            return True
+
+    def validate_indirect_object(self) -> bool:
+        """Validate container if taking from container"""
+        if not self.indirect_object:
+            return True  # No container specified
+
+        container = self.game.find_item(self.indirect_object)
+        if not container:
+            print(f"You don't see any {self.indirect_object} here.")
+            return False
+
+        if 'CONTBIT' not in container.flags:
+            print(f"You can't take things from the {container.desc}.")
+            return False
+
+        return True
+
+    def effect(self):
+        """Take the item and add to inventory"""
+        item = self.game.find_item(self.direct_object)
+
+        if self.indirect_object:
+            # Taking from container
+            container = self.game.find_item(self.indirect_object)
+            # Find the actual item in container (by location)
+            for item_name, potential_item in self.game.items.items():
+                if potential_item.location == container.name and potential_item.matches(self.direct_object):
+                    item = potential_item
+                    break
+
+            self.game.state.add_item(item.name)
+            item.location = 'inventory'
+            print(f"You take the {item.desc} from the {container.desc}.")
+        else:
+            # Taking from room
+            room = self.game.get_current_room()
+
+            # Remove from current location
+            if item.name in room.items:
+                room.items.remove(item.name)
+            elif item.location and item.location in self.game.items:
+                # Item is in a container - don't remove from container's item list
+                pass
+
+            # Add to inventory
+            self.game.state.add_item(item.name)
+            item.location = 'inventory'
+            print("Taken.")
+
+
+class DropAction(BaseAction):
+    """Action to drop an item in room or container"""
+
+    @staticmethod
+    def from_command(command: str, game: 'ZorkGame') -> 'DropAction':
+        """Factory method to create DropAction from command
+
+        Args:
+            command: Full command string (e.g., "drop sword" or "put sword in case")
+            game: The game instance
+        """
+        tokens = command.split()
+        verb = tokens[0] if tokens else None
+
+        # Check for "put X in Y" pattern
+        if 'in' in tokens:
+            in_idx = tokens.index('in')
+            direct_object = ' '.join(tokens[1:in_idx])
+            preposition = 'in'
+            indirect_object = ' '.join(tokens[in_idx+1:])
+        else:
+            # Simple "drop X"
+            direct_object = ' '.join(tokens[1:]) if len(tokens) > 1 else None
+            preposition = None
+            indirect_object = None
+
+        return DropAction(game, direct_object, preposition, indirect_object)
+
+    def validate_direct_object(self) -> bool:
+        """Validate object exists and is in inventory"""
+        if not self.direct_object:
+            if self.indirect_object:
+                print("Put what where?")
+            else:
+                print("Drop what?")
+            return False
+
+        item = self.game.find_item(self.direct_object)
+        if not item:
+            if self.indirect_object:
+                print(f"You don't see any {self.direct_object} here.")
+            else:
+                print(f"You don't have that.")
+            return False
+
+        # Check if in inventory
+        if not self.game.state.has_item(item.name):
+            print(f"You aren't holding the {item.desc}.")
+            return False
+
+        return True
+
+    def validate_indirect_object(self) -> bool:
+        """Validate container if putting in container"""
+        if not self.indirect_object:
+            return True  # No container specified
+
+        container = self.game.find_item(self.indirect_object)
+        if not container:
+            print(f"You don't see any {self.indirect_object} here.")
+            return False
+
+        if 'CONTBIT' not in container.flags:
+            print(f"You can't put things in the {container.desc}.")
+            return False
+
+        return True
+
+    def effect(self):
+        """Drop the item in room or container"""
+        item = self.game.find_item(self.direct_object)
+        self.game.state.remove_item(item.name)
+
+        if self.indirect_object:
+            # Putting in container
+            container = self.game.find_item(self.indirect_object)
+            item.location = container.name
+
+            # Trophy case scoring
+            if container.name == 'trophy_case' and item.value > 0:
+                points = item.value
+                self.game.state.score += points
+                print(f"You put the {item.desc} in the {container.desc}.")
+                print(f"Your score has just gone up by {points} point{'s' if points != 1 else ''}!")
+            else:
+                print(f"You put the {item.desc} in the {container.desc}.")
+        else:
+            # Simple drop in room
+            room = self.game.get_current_room()
+            room.items.append(item.name)
+            item.location = room.name
+            print("Dropped.")
+
+
 class ZorkGame:
     """Main game engine"""
 
@@ -710,57 +1078,13 @@ class ZorkGame:
 
     def do_take(self, obj_name: str, _=None):
         """Take an item"""
-        if not obj_name:
-            print("Take what?")
-            return
-
-        item = self.find_item(obj_name)
-
-        if not item:
-            print(f"I don't see any {obj_name} here.")
-            return
-
-        if not item.takeable and 'TAKEBIT' not in item.flags:
-            print(f"You can't take the {item.desc}.")
-            return
-
-        if item.location in self.state.inventory:
-            print("You already have that.")
-            return
-
-        # Remove from current location
-        room = self.get_current_room()
-        if item.name in room.items:
-            room.items.remove(item.name)
-        elif item.location and item.location in self.items:
-            # Item is in a container
-            pass
-
-        self.state.add_item(item.name)
-        item.location = 'inventory'
-        print("Taken.")
+        action = TakeAction(self, obj_name)
+        action()
 
     def do_drop(self, obj_name: str, _=None):
         """Drop an item"""
-        if not obj_name:
-            print("Drop what?")
-            return
-
-        item = self.find_item(obj_name)
-
-        if not item:
-            print(f"You don't have that.")
-            return
-
-        if not self.state.has_item(item.name):
-            print(f"You don't have the {item.desc}.")
-            return
-
-        self.state.remove_item(item.name)
-        room = self.get_current_room()
-        room.items.append(item.name)
-        item.location = room.name
-        print("Dropped.")
+        action = DropAction(self, obj_name)
+        action()
 
     def find_and_validate_container(self, container_name: str) -> Optional[Item]:
         """Find a container and validate it's actually a container
@@ -784,64 +1108,13 @@ class ZorkGame:
 
     def do_put_in(self, obj_name: str, container_name: str):
         """Put an item in a container"""
-        if not obj_name:
-            print("Put what where?")
-            return
-
-        # Find the item to put
-        item = self.find_item(obj_name)
-        if not item:
-            print(f"You don't see any {obj_name} here.")
-            return
-
-        if not self.state.has_item(item.name):
-            print(f"You aren't holding the {item.desc}.")
-            return
-
-        # Validate container
-        container = self.find_and_validate_container(container_name)
-        if not container:
-            return
-
-        # Remove from inventory and add to container
-        self.state.remove_item(item.name)
-        item.location = container.name
-
-        # Trophy case scoring
-        if container.name == 'trophy_case' and item.value > 0:
-            points = item.value
-            self.state.score += points
-            print(f"You put the {item.desc} in the {container.desc}.")
-            print(f"Your score has just gone up by {points} point{'s' if points != 1 else ''}!")
-        else:
-            print(f"You put the {item.desc} in the {container.desc}.")
+        action = DropAction(self, obj_name, 'in', container_name)
+        action()
 
     def do_take_from(self, obj_name: str, container_name: str):
         """Take an item from a container"""
-        if not obj_name:
-            print("Take what from what?")
-            return
-
-        # Validate container
-        container = self.find_and_validate_container(container_name)
-        if not container:
-            return
-
-        # Find the item in the container
-        item = None
-        for item_name, potential_item in self.items.items():
-            if potential_item.location == container.name and potential_item.matches(obj_name):
-                item = potential_item
-                break
-
-        if not item:
-            print(f"There's no {obj_name} in the {container.desc}.")
-            return
-
-        # Take it
-        self.state.add_item(item.name)
-        item.location = 'inventory'
-        print(f"You take the {item.desc} from the {container.desc}.")
+        action = TakeAction(self, obj_name, 'from', container_name)
+        action()
 
     def do_inventory(self, _=None, __=None):
         """Show inventory"""
@@ -952,55 +1225,15 @@ class ZorkGame:
         else:
             print(f"You can't move the {item.desc}.")
 
-    def do_light_toggle(self, obj_name: str, turn_on: bool):
-        """Toggle light source on/off"""
-        if not obj_name:
-            print(f"Turn {'on' if turn_on else 'off'} what?")
-            return
-
-        item = self.find_item(obj_name)
-        if not item:
-            print(f"I don't see any {obj_name} here.")
-            return
-
-        if 'LIGHTBIT' not in item.flags:
-            print(f"You can't turn that {'on' if turn_on else 'off'}.")
-            return
-
-        is_on = 'ONBIT' in item.flags
-
-        if turn_on:
-            if is_on:
-                print("It is already on.")
-                return
-            item.flags.add('ONBIT')
-            print(f"The {item.desc} is now on.")
-        else:
-            if not is_on:
-                print("It is already off.")
-                return
-            item.flags.discard('ONBIT')
-            print(f"The {item.desc} is now off.")
-
-        # Update room lighting and react to light changes
-        was_lit = self.state.lit
-        self.state.lit = self.is_room_lit()
-
-        if not was_lit and self.state.lit:
-            # Room just became lit - show description
-            print()
-            self.do_look()
-        elif was_lit and not self.state.lit:
-            # Room just became dark
-            print("It is now pitch black.")
-
     def do_turn_on(self, obj_name: str, _=None):
         """Turn on a light source"""
-        self.do_light_toggle(obj_name, True)
+        action = TurnOnOffAction(self, obj_name, turn_on=True)
+        action()
 
     def do_turn_off(self, obj_name: str, _=None):
         """Turn off a light source"""
-        self.do_light_toggle(obj_name, False)
+        action = TurnOnOffAction(self, obj_name, turn_on=False)
+        action()
 
     def handle_turn_command(self, obj_name: str, modifier: str):
         """Handle 'turn on' and 'turn off' commands
@@ -1013,19 +1246,15 @@ class ZorkGame:
         if obj_name in ['on', 'off']:
             if modifier:
                 # "turn on lantern"
-                if obj_name == 'on':
-                    self.do_turn_on(modifier)
-                else:
-                    self.do_turn_off(modifier)
+                action = TurnOnOffAction(self, modifier, turn_on=(obj_name == 'on'))
+                action()
             else:
                 print(f"Turn {obj_name} what?")
         # Check if second word is on/off
         elif modifier and modifier in ['on', 'off']:
             # "turn lantern on"
-            if modifier == 'on':
-                self.do_turn_on(obj_name)
-            else:
-                self.do_turn_off(obj_name)
+            action = TurnOnOffAction(self, obj_name, turn_on=(modifier == 'on'))
+            action()
         else:
             print("You want to turn what on or off?")
 
