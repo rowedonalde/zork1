@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """
-Unit tests for Zork action classes
+Unit tests for Zork action classes and game content
+
+Tests include:
+- Action classes (turn on/off, take, drop, open, close, etc.)
+- Content integration (rooms, objects, treasures)
+- Game mechanics (scoring, navigation, combat)
 
 Run with: python -m unittest test_actions
 Or: python test_actions.py
@@ -464,6 +469,100 @@ class TestOpenCloseAction(TestBaseActionClasses):
         output = self.capture_output(action)
 
         self.assertIn('Close what', output)
+
+
+class TestContentIntegration(TestBaseActionClasses):
+    """Test game content: rooms, objects, treasures"""
+
+    def test_round_room_navigation(self):
+        """Test navigation to Round Room via troll defeat"""
+        self.game.do_take('sword')
+        self.game.do_open('trap door')
+        self.game.do_move('rug')
+        self.game.do_go('down')
+        self.game.do_go('north')
+
+        # Manually set troll_flag to test navigation
+        self.game.state.flags['troll_flag'] = True
+        self.game.do_go('west')
+
+        self.assertEqual(self.game.state.current_room, 'round_room')
+
+    def test_treasure_locations(self):
+        """Test that new treasures exist in correct rooms"""
+        treasures = {
+            'loud_room': 'platinum_bar',
+            'deep_ravine': 'chalice',
+            'mirror_room': 'trident',
+            'cold_passage': 'torch',
+            'maze_1': 'coins'
+        }
+
+        for room_name, treasure_name in treasures.items():
+            room = self.game.rooms[room_name]
+            self.assertIn(treasure_name, room.items)
+            item = self.game.items[treasure_name]
+            self.assertIn('TAKEBIT', item.flags)
+            self.assertGreater(item.value, 0)
+
+    def test_tool_locations(self):
+        """Test that tool items exist in correct rooms"""
+        tools = {
+            'attic': 'rope',
+            'kitchen': 'bottle',
+            'round_room': 'knife',
+            'slide_room': 'shovel'
+        }
+
+        for room_name, tool_name in tools.items():
+            room = self.game.rooms[room_name]
+            self.assertIn(tool_name, room.items)
+            item = self.game.items[tool_name]
+            self.assertIn('TAKEBIT', item.flags)
+
+    def test_maze_navigation(self):
+        """Test navigation through maze rooms"""
+        self.game.state.current_room = 'round_room'
+        self.game.do_go('south')
+        self.assertEqual(self.game.state.current_room, 'maze_entrance')
+
+        self.game.do_go('south')
+        self.assertEqual(self.game.state.current_room, 'maze_1')
+
+    def test_room_count(self):
+        """Test that expected number of rooms exist"""
+        total_rooms = len(self.game.rooms)
+        self.assertGreaterEqual(total_rooms, 31)
+
+    def test_object_counts(self):
+        """Test object and treasure counts"""
+        total_objects = len(self.game.items)
+        takeable_objects = sum(1 for item in self.game.items.values() if 'TAKEBIT' in item.flags)
+        treasures = sum(1 for item in self.game.items.values()
+                       if 'TAKEBIT' in item.flags and item.value > 0)
+
+        self.assertGreaterEqual(total_objects, 21)
+        self.assertGreaterEqual(takeable_objects, 15)
+        self.assertGreaterEqual(treasures, 10)
+
+    def test_new_treasure_definitions(self):
+        """Test that new treasures are properly defined"""
+        treasure_items = ['platinum_bar', 'chalice', 'trident', 'torch', 'coins']
+
+        for treasure in treasure_items:
+            item = self.game.items.get(treasure)
+            self.assertIsNotNone(item, f"{treasure} not defined")
+            self.assertIn('TAKEBIT', item.flags, f"{treasure} not takeable")
+            self.assertGreater(item.value, 0, f"{treasure} has no value")
+
+    def test_total_treasure_value(self):
+        """Test total treasure value in game"""
+        all_treasures = [item for item in self.game.items.values()
+                        if 'TAKEBIT' in item.flags and item.value > 0]
+        total_value = sum(t.value for t in all_treasures)
+
+        self.assertGreaterEqual(total_value, 62)
+        self.assertGreaterEqual(len(all_treasures), 10)
 
 
 if __name__ == '__main__':

@@ -1317,7 +1317,7 @@ class ZorkGame:
             exits=[
                 Exit(Direction.SOUTH, 'cellar'),
                 Exit(Direction.EAST, 'east_of_chasm', condition=lambda: self.state.flags['troll_flag']),
-                Exit(Direction.WEST, 'east_of_chasm', condition=lambda: self.state.flags['troll_flag']),
+                Exit(Direction.WEST, 'round_room', condition=lambda: self.state.flags['troll_flag']),
             ]
         )
 
@@ -1450,6 +1450,153 @@ class ZorkGame:
             flags={'ONBIT', 'SACREDBIT'}
         )
 
+        # Underground expansion - Round Room and connected areas
+        self.rooms['round_room'] = Room(
+            name='round_room',
+            short_desc='Round Room',
+            desc='You are in a large round room with passages leading in many directions. '
+                 'The room is dimly lit by phosphorescent lichens on the walls.',
+            exits=[
+                Exit(Direction.EAST, 'troll_room'),
+                Exit(Direction.NORTH, 'deep_ravine'),
+                Exit(Direction.NE, 'loud_room'),
+                Exit(Direction.SE, 'narrow_passage'),
+                Exit(Direction.SOUTH, 'maze_entrance'),
+                Exit(Direction.SW, 'west_passage'),
+            ],
+            flags={'ONBIT'}  # Lit by lichens
+        )
+
+        self.rooms['loud_room'] = Room(
+            name='loud_room',
+            short_desc='Loud Room',
+            desc='This is a large room with a ceiling which cannot be detected from the ground. '
+                 'There is a narrow passage from west to east and a stone stairway leading upward. '
+                 'The room is extremely noisy. In fact, it is difficult to hear yourself think.',
+            exits=[
+                Exit(Direction.WEST, 'round_room'),
+                Exit(Direction.EAST, None, "The passage is blocked by an avalanche of boulders."),
+                Exit(Direction.UP, 'deep_ravine'),
+            ]
+        )
+
+        self.rooms['deep_ravine'] = Room(
+            name='deep_ravine',
+            short_desc='Deep Ravine',
+            desc='You are on the south edge of a deep ravine. Passages exit to the south and northwest.',
+            exits=[
+                Exit(Direction.SOUTH, 'round_room'),
+                Exit(Direction.NW, 'north_south_passage'),
+                Exit(Direction.DOWN, 'loud_room'),
+            ]
+        )
+
+        self.rooms['north_south_passage'] = Room(
+            name='north_south_passage',
+            short_desc='North-South Passage',
+            desc='This is a high north-south passage, which forks to the northeast.',
+            exits=[
+                Exit(Direction.NORTH, None, "The passage quickly narrows to an impassable crack."),
+                Exit(Direction.SOUTH, None, "The passage ends in a steep cliff."),
+                Exit(Direction.NE, None, "The passage is blocked by collapsed rubble."),
+                Exit(Direction.SE, 'deep_ravine'),
+            ]
+        )
+
+        self.rooms['narrow_passage'] = Room(
+            name='narrow_passage',
+            short_desc='Narrow Passage',
+            desc='This is a long and narrow corridor where a long north-south passageway briefly '
+                 'narrows even further.',
+            exits=[
+                Exit(Direction.NORTH, 'round_room'),
+                Exit(Direction.SOUTH, 'mirror_room'),
+            ]
+        )
+
+        self.rooms['mirror_room'] = Room(
+            name='mirror_room',
+            short_desc='Mirror Room',
+            desc='You are in a large square room with tall ceilings. On the south wall is an enormous '
+                 'mirror which fills the entire wall. There are exits on the other three sides of the room.',
+            exits=[
+                Exit(Direction.NORTH, 'narrow_passage'),
+                Exit(Direction.WEST, 'cold_passage'),
+                Exit(Direction.EAST, None, "The passage is too dark to navigate safely."),
+                Exit(Direction.SOUTH, None, "You cannot pass through the mirror."),
+            ]
+        )
+
+        self.rooms['cold_passage'] = Room(
+            name='cold_passage',
+            short_desc='Cold Passage',
+            desc='This is a cold and damp corridor carved out of the rock.',
+            exits=[
+                Exit(Direction.EAST, 'mirror_room'),
+                Exit(Direction.WEST, 'slide_room'),
+                Exit(Direction.SOUTH, None, "The passage ends in a steep cliff."),
+            ]
+        )
+
+        self.rooms['slide_room'] = Room(
+            name='slide_room',
+            short_desc='Slide Room',
+            desc='This is a small chamber, which appears to have been part of a coal mine. On the '
+                 'south wall of the room is a passage, blocked by a heavy wooden door. A stairway '
+                 'leads down, but it is extremely steep and cannot be safely descended.',
+            exits=[
+                Exit(Direction.EAST, 'cold_passage'),
+                Exit(Direction.SOUTH, None, "The wooden door is tightly shut."),
+                Exit(Direction.DOWN, None, "The stairs are too steep and dangerous to descend."),
+            ]
+        )
+
+        self.rooms['maze_entrance'] = Room(
+            name='maze_entrance',
+            short_desc='Maze Entrance',
+            desc='You are in a maze of twisty little passages, all alike.',
+            exits=[
+                Exit(Direction.NORTH, 'round_room'),
+                Exit(Direction.SOUTH, 'maze_1'),
+                Exit(Direction.EAST, 'maze_2'),
+                Exit(Direction.WEST, None, "You are in a maze of twisty little passages, all alike."),
+            ]
+        )
+
+        self.rooms['maze_1'] = Room(
+            name='maze_1',
+            short_desc='Maze',
+            desc='You are in a maze of twisty little passages, all alike.',
+            exits=[
+                Exit(Direction.NORTH, 'maze_entrance'),
+                Exit(Direction.SOUTH, None, "You are in a maze of twisty little passages, all alike."),
+                Exit(Direction.EAST, None, "You are in a maze of twisty little passages, all alike."),
+                Exit(Direction.WEST, 'maze_2'),
+            ]
+        )
+
+        self.rooms['maze_2'] = Room(
+            name='maze_2',
+            short_desc='Maze',
+            desc='You are in a maze of twisty little passages, all alike.',
+            exits=[
+                Exit(Direction.NORTH, None, "You are in a maze of twisty little passages, all alike."),
+                Exit(Direction.SOUTH, None, "You are in a maze of twisty little passages, all alike."),
+                Exit(Direction.EAST, 'maze_1'),
+                Exit(Direction.WEST, 'maze_entrance'),
+            ]
+        )
+
+        self.rooms['west_passage'] = Room(
+            name='west_passage',
+            short_desc='West of Round Room',
+            desc='This is a narrow passage with a low ceiling. It connects to the Round Room to the northeast.',
+            exits=[
+                Exit(Direction.NE, 'round_room'),
+                Exit(Direction.WEST, None, "The passage is blocked by fallen rocks."),
+            ]
+        )
+
         # Create items
         self.items['mailbox'] = Item(
             name='mailbox',
@@ -1544,6 +1691,66 @@ class ZorkGame:
             size=10
         )
 
+        self.items['platinum_bar'] = Item(
+            name='platinum_bar',
+            desc='platinum bar',
+            synonyms=['bar', 'platinum'],
+            adjectives=['platinum'],
+            location='loud_room',
+            takeable=True,
+            flags={'TAKEBIT'},
+            value=10,
+            size=10
+        )
+
+        self.items['chalice'] = Item(
+            name='chalice',
+            desc='jeweled chalice',
+            synonyms=['cup', 'grail'],
+            adjectives=['jeweled', 'gold', 'golden'],
+            location='deep_ravine',
+            takeable=True,
+            flags={'TAKEBIT'},
+            value=10,
+            size=10
+        )
+
+        self.items['trident'] = Item(
+            name='trident',
+            desc='crystal trident',
+            synonyms=['fork', 'spear'],
+            adjectives=['crystal', 'crystalline'],
+            location='mirror_room',
+            takeable=True,
+            flags={'TAKEBIT'},
+            value=4,
+            size=15
+        )
+
+        self.items['torch'] = Item(
+            name='torch',
+            desc='ivory torch',
+            synonyms=['flame'],
+            adjectives=['ivory', 'white'],
+            location='cold_passage',
+            takeable=True,
+            flags={'TAKEBIT'},
+            value=6,
+            size=12
+        )
+
+        self.items['coins'] = Item(
+            name='coins',
+            desc='bag of coins',
+            synonyms=['bag', 'coin', 'gold'],
+            adjectives=['gold', 'golden'],
+            location='maze_1',
+            takeable=True,
+            flags={'TAKEBIT'},
+            value=5,
+            size=8
+        )
+
         # NPCs
         self.items['troll'] = Item(
             name='troll',
@@ -1564,12 +1771,81 @@ class ZorkGame:
             flags={'TRYTAKEBIT'}
         )
 
+        # Tools and utility items
+        self.items['rope'] = Item(
+            name='rope',
+            desc='hemp rope',
+            synonyms=['cord', 'line'],
+            adjectives=['hemp', 'thick'],
+            location='attic',
+            takeable=True,
+            flags={'TAKEBIT'},
+            size=15
+        )
+
+        self.items['knife'] = Item(
+            name='knife',
+            desc='nasty knife',
+            synonyms=['blade', 'dagger'],
+            adjectives=['nasty', 'sharp'],
+            location='round_room',
+            takeable=True,
+            flags={'TAKEBIT', 'WEAPONBIT'},
+            value=5,
+            size=10
+        )
+
+        self.items['bottle'] = Item(
+            name='bottle',
+            desc='glass bottle',
+            synonyms=['flask', 'container'],
+            adjectives=['glass', 'clear'],
+            location='kitchen',
+            takeable=True,
+            flags={'TAKEBIT', 'CONTBIT'},
+            size=8
+        )
+
+        self.items['shovel'] = Item(
+            name='shovel',
+            desc='sturdy shovel',
+            synonyms=['spade', 'tool'],
+            adjectives=['sturdy', 'metal'],
+            location='slide_room',
+            takeable=True,
+            flags={'TAKEBIT'},
+            size=25
+        )
+
+        self.items['axe'] = Item(
+            name='axe',
+            desc='bloody axe',
+            synonyms=['hatchet', 'weapon'],
+            adjectives=['bloody', 'rusty'],
+            location=None,  # Dropped by troll when killed
+            takeable=True,
+            flags={'TAKEBIT', 'WEAPONBIT', 'NDESCBIT'},
+            value=3,
+            size=20
+        )
+
         # Add items to rooms
         self.rooms['west_of_house'].items.append('mailbox')
         self.rooms['living_room'].items.extend(['sword', 'lantern', 'rug', 'trap_door', 'trophy_case', 'jewels'])
         self.rooms['gallery'].items.append('painting')
         self.rooms['troll_room'].items.append('troll')
         self.rooms['path'].items.append('tree')
+        self.rooms['attic'].items.append('rope')
+        self.rooms['kitchen'].items.append('bottle')
+
+        # Underground treasure locations
+        self.rooms['loud_room'].items.append('platinum_bar')
+        self.rooms['deep_ravine'].items.append('chalice')
+        self.rooms['mirror_room'].items.append('trident')
+        self.rooms['cold_passage'].items.append('torch')
+        self.rooms['maze_1'].items.append('coins')
+        self.rooms['round_room'].items.append('knife')
+        self.rooms['slide_room'].items.append('shovel')
 
     def get_current_room(self) -> Room:
         """Get the current room object"""
