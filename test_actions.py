@@ -11,7 +11,7 @@ import sys
 from io import StringIO
 from zork import ZorkGame, TurnOnOffAction, TakeAction, DropAction
 from zork import ExamineAction, GiveAction, AttackAction, ThrowAction
-from zork import ClimbAction, MoveAction
+from zork import ClimbAction, MoveAction, OpenCloseAction
 
 
 class TestBaseActionClasses(unittest.TestCase):
@@ -339,6 +339,131 @@ class TestMoveAction(TestBaseActionClasses):
         output = self.capture_output(action)
 
         self.assertIn("can't move", output)
+
+
+class TestOpenCloseAction(TestBaseActionClasses):
+    """Test open/close actions"""
+
+    def test_open_window_at_east_of_house(self):
+        """Test opening the window at east of house"""
+        self.game.state.current_room = 'east_of_house'
+        action = OpenCloseAction(self.game, 'window', is_opening=True)
+        output = self.capture_output(action)
+
+        self.assertIn('open the window far enough to allow entry', output)
+        self.assertTrue(self.game.state.flags['kitchen_window_open'])
+
+    def test_open_window_already_open(self):
+        """Test opening an already-open window"""
+        self.game.state.current_room = 'east_of_house'
+        self.game.state.flags['kitchen_window_open'] = True
+
+        action = OpenCloseAction(self.game, 'window', is_opening=True)
+        output = self.capture_output(action)
+
+        self.assertIn('already open', output)
+
+    def test_close_window(self):
+        """Test closing the window"""
+        self.game.state.current_room = 'east_of_house'
+        self.game.state.flags['kitchen_window_open'] = True
+
+        action = OpenCloseAction(self.game, 'window', is_opening=False)
+        output = self.capture_output(action)
+
+        self.assertIn('window is now closed', output)
+        self.assertFalse(self.game.state.flags['kitchen_window_open'])
+
+    def test_close_window_already_closed(self):
+        """Test closing an already-closed window"""
+        self.game.state.current_room = 'east_of_house'
+        self.game.state.flags['kitchen_window_open'] = False
+
+        action = OpenCloseAction(self.game, 'window', is_opening=False)
+        output = self.capture_output(action)
+
+        self.assertIn('already closed', output)
+
+    def test_open_mailbox(self):
+        """Test opening the mailbox shows leaflet"""
+        self.game.state.current_room = 'west_of_house'
+        action = OpenCloseAction(self.game, 'mailbox', is_opening=True)
+        output = self.capture_output(action)
+
+        self.assertIn('reveals a leaflet', output)
+
+    def test_open_mailbox_empty(self):
+        """Test opening empty mailbox"""
+        self.game.state.current_room = 'west_of_house'
+        # Take the leaflet first using TakeAction
+        take_action = TakeAction(self.game, 'leaflet', 'from', 'mailbox')
+        self.capture_output(take_action)
+
+        action = OpenCloseAction(self.game, 'mailbox', is_opening=True)
+        output = self.capture_output(action)
+
+        self.assertIn('mailbox is empty', output)
+
+    def test_open_trap_door(self):
+        """Test opening the trap door"""
+        # First reveal the trap door by moving the rug
+        self.game.do_move('rug')
+
+        action = OpenCloseAction(self.game, 'trap_door', is_opening=True)
+        output = self.capture_output(action)
+
+        self.assertIn('reluctantly opens', output)
+        self.assertIn('rickety staircase', output)
+        self.assertTrue(self.game.state.flags['trap_door_open'])
+
+    def test_open_trap_door_already_open(self):
+        """Test opening an already-open trap door"""
+        self.game.do_move('rug')
+        self.game.state.flags['trap_door_open'] = True
+
+        action = OpenCloseAction(self.game, 'trap_door', is_opening=True)
+        output = self.capture_output(action)
+
+        self.assertIn('already open', output)
+
+    def test_close_trap_door(self):
+        """Test closing the trap door"""
+        self.game.do_move('rug')
+        self.game.state.flags['trap_door_open'] = True
+
+        action = OpenCloseAction(self.game, 'trap_door', is_opening=False)
+        output = self.capture_output(action)
+
+        self.assertIn('trap door is now closed', output)
+        self.assertFalse(self.game.state.flags['trap_door_open'])
+
+    def test_open_non_openable(self):
+        """Test opening something that can't be opened"""
+        action = OpenCloseAction(self.game, 'sword', is_opening=True)
+        output = self.capture_output(action)
+
+        self.assertIn("can't open", output)
+
+    def test_close_non_closeable(self):
+        """Test closing something that can't be closed"""
+        action = OpenCloseAction(self.game, 'sword', is_opening=False)
+        output = self.capture_output(action)
+
+        self.assertIn("can't close", output)
+
+    def test_open_no_object(self):
+        """Test open with no object"""
+        action = OpenCloseAction(self.game, None, is_opening=True)
+        output = self.capture_output(action)
+
+        self.assertIn('Open what', output)
+
+    def test_close_no_object(self):
+        """Test close with no object"""
+        action = OpenCloseAction(self.game, None, is_opening=False)
+        output = self.capture_output(action)
+
+        self.assertIn('Close what', output)
 
 
 if __name__ == '__main__':
