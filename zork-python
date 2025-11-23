@@ -6,7 +6,7 @@
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Path to the Python script
-ZORK_PY="$SCRIPT_DIR/zork.py"
+ZORK_PY="$SCRIPT_DIR/play.py"
 
 # Check if Python 3 is available
 if ! command -v python3 &> /dev/null; then
@@ -17,7 +17,7 @@ fi
 
 # Check if the Python script exists
 if [ ! -f "$ZORK_PY" ]; then
-    echo "Error: zork.py not found at $ZORK_PY"
+    echo "Error: play.py not found at $ZORK_PY"
     exit 1
 fi
 
