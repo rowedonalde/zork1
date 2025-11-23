@@ -1389,6 +1389,7 @@ class ZorkGame:
                 Exit(Direction.NORTH, None, "The forest becomes impenetrable to the north."),
                 Exit(Direction.SOUTH, 'clearing'),
                 Exit(Direction.WEST, 'path'),
+                Exit(Direction.EAST, 'grating_clearing'),
             ],
             flags={'ONBIT', 'SACREDBIT'}
         )
@@ -1443,11 +1444,78 @@ class ZorkGame:
                  'complete with rainbow.',
             exits=[
                 Exit(Direction.WEST, 'clearing'),
-                Exit(Direction.NORTH, None, "The canyon is too wide to cross."),
+                Exit(Direction.NORTH, 'dam'),
                 Exit(Direction.SOUTH, None, "The canyon is too wide to cross."),
                 Exit(Direction.EAST, None, "The canyon is too wide to cross."),
             ],
             flags={'ONBIT', 'SACREDBIT'}
+        )
+
+        # Dam area (surface)
+        self.rooms['dam'] = Room(
+            name='dam',
+            short_desc='Dam',
+            desc='You are standing on the top of the Flood Control Dam #3, which was quite '
+                 'a tourist attraction in times far distant. There are paths to the north, south, '
+                 'and west, and a scramble down.',
+            exits=[
+                Exit(Direction.NORTH, 'dam_lobby'),
+                Exit(Direction.SOUTH, 'canyon_view'),
+                Exit(Direction.WEST, None, "The path leads to a sheer cliff."),
+                Exit(Direction.DOWN, None, "The dam face is too steep to climb."),
+            ],
+            flags={'ONBIT', 'SACREDBIT'}
+        )
+
+        self.rooms['dam_lobby'] = Room(
+            name='dam_lobby',
+            short_desc='Dam Lobby',
+            desc='This is the lobby for Flood Control Dam #3. There are bare concrete walls here, '
+                 'with an exit to the south and a door to the east leading to the dam maintenance room.',
+            exits=[
+                Exit(Direction.SOUTH, 'dam'),
+                Exit(Direction.EAST, 'maintenance_room'),
+            ],
+            flags={'ONBIT'}
+        )
+
+        self.rooms['maintenance_room'] = Room(
+            name='maintenance_room',
+            short_desc='Maintenance Room',
+            desc='This is what appears to be a maintenance room. There is a tool board here, '
+                 'a switch, and a drainage pipe leading down. On one wall is a group of buttons '
+                 'colored blue, yellow, brown, and red. There is a doorway to the west.',
+            exits=[
+                Exit(Direction.WEST, 'dam_lobby'),
+                Exit(Direction.DOWN, None, "The drainage pipe is too small to fit through."),
+            ],
+            flags={'ONBIT'}
+        )
+
+        # Grating area (surface)
+        self.rooms['grating_clearing'] = Room(
+            name='grating_clearing',
+            short_desc='Grating Clearing',
+            desc='You are in a small clearing in a well marked forest path. In the center of the '
+                 'clearing is a grating securely fastened into the ground. All passages lead west.',
+            exits=[
+                Exit(Direction.WEST, 'forest_2'),
+                Exit(Direction.DOWN, 'grating_room', condition=lambda: self.state.flags.get('grating_open', False)),
+            ],
+            flags={'ONBIT', 'SACREDBIT'}
+        )
+
+        self.rooms['grating_room'] = Room(
+            name='grating_room',
+            short_desc='Grating Room',
+            desc='You are in a small room near the grating. There are small passages to the south and west, '
+                 'and a steep metal ramp descending to the east.',
+            exits=[
+                Exit(Direction.UP, 'grating_clearing', condition=lambda: self.state.flags.get('grating_open', False)),
+                Exit(Direction.SOUTH, 'reservoir_south'),
+                Exit(Direction.WEST, None, "The passage is blocked by debris."),
+                Exit(Direction.EAST, 'machine_room'),
+            ]
         )
 
         # Underground expansion - Round Room and connected areas
@@ -1569,7 +1637,7 @@ class ZorkGame:
             desc='You are in a maze of twisty little passages, all alike.',
             exits=[
                 Exit(Direction.NORTH, 'maze_entrance'),
-                Exit(Direction.SOUTH, None, "You are in a maze of twisty little passages, all alike."),
+                Exit(Direction.SOUTH, 'maze_3'),
                 Exit(Direction.EAST, None, "You are in a maze of twisty little passages, all alike."),
                 Exit(Direction.WEST, 'maze_2'),
             ]
@@ -1594,6 +1662,273 @@ class ZorkGame:
             exits=[
                 Exit(Direction.NE, 'round_room'),
                 Exit(Direction.WEST, None, "The passage is blocked by fallen rocks."),
+            ]
+        )
+
+        # Reservoir area (underground)
+        self.rooms['reservoir_south'] = Room(
+            name='reservoir_south',
+            short_desc='Reservoir South',
+            desc='You are in a large cavernous room, the south end of a large reservoir. Across the '
+                 'water to the north you can see a dimly lit shore. There is a path going south and '
+                 'a passage leading north along the shore.',
+            exits=[
+                Exit(Direction.NORTH, 'grating_room'),
+                Exit(Direction.SOUTH, 'chasm'),
+                Exit(Direction.EAST, None, "You would drown trying to cross the deep water."),
+            ]
+        )
+
+        self.rooms['reservoir_north'] = Room(
+            name='reservoir_north',
+            short_desc='Reservoir',
+            desc='You are on the shore of a large underground reservoir. A path leads north and '
+                 'passages go south and east.',
+            exits=[
+                Exit(Direction.NORTH, 'stream'),
+                Exit(Direction.SOUTH, None, "The water is too deep to wade across."),
+                Exit(Direction.EAST, 'deep_canyon'),
+            ]
+        )
+
+        self.rooms['stream'] = Room(
+            name='stream',
+            short_desc='Stream',
+            desc='You are standing on a path beside a gently flowing stream. The path continues to '
+                 'the north and south. To the east is a large boulder.',
+            exits=[
+                Exit(Direction.NORTH, 'stream_view'),
+                Exit(Direction.SOUTH, 'reservoir_north'),
+                Exit(Direction.EAST, None, "The boulder is too large to pass."),
+            ]
+        )
+
+        self.rooms['stream_view'] = Room(
+            name='stream_view',
+            short_desc='Stream View',
+            desc='You are standing high on a ledge overlooking a stream. A path leads south along '
+                 'the ledge. To the east is an enormous cavern.',
+            exits=[
+                Exit(Direction.SOUTH, 'stream'),
+                Exit(Direction.EAST, 'treasure_room'),
+                Exit(Direction.DOWN, None, "The drop is too steep."),
+            ]
+        )
+
+        # Temple and treasure areas
+        self.rooms['temple'] = Room(
+            name='temple',
+            short_desc='Temple',
+            desc='This is the north end of a large temple. In front of you is what appears to be '
+                 'an altar. In one corner is a small hole in the floor which leads into darkness. '
+                 'A path exits to the south and west.',
+            exits=[
+                Exit(Direction.SOUTH, 'egyptian_room'),
+                Exit(Direction.WEST, 'torch_room'),
+                Exit(Direction.DOWN, None, "The hole is too small to fit through."),
+            ],
+            flags={'ONBIT'}  # Temple is lit
+        )
+
+        self.rooms['egyptian_room'] = Room(
+            name='egyptian_room',
+            short_desc='Egyptian Room',
+            desc='This is a room, which appears to have been part of an Egyptian tomb. The walls '
+                 'are covered with hieroglyphics. A passage leads north, and a steep staircase leads '
+                 'upward and to the south.',
+            exits=[
+                Exit(Direction.NORTH, 'temple'),
+                Exit(Direction.UP, 'torch_room'),
+                Exit(Direction.SOUTH, None, "The staircase has collapsed."),
+            ]
+        )
+
+        self.rooms['torch_room'] = Room(
+            name='torch_room',
+            short_desc='Torch Room',
+            desc='This is a large room with torches mounted on the walls. The flickering torches '
+                 'illuminate the cave with an eerie light. There are exits to the east and west, '
+                 'and passages going north and south.',
+            exits=[
+                Exit(Direction.EAST, 'temple'),
+                Exit(Direction.WEST, 'north_south_corridor'),
+                Exit(Direction.NORTH, None, "The passage is blocked by fallen rocks."),
+                Exit(Direction.SOUTH, None, "The floor has collapsed here."),
+            ],
+            flags={'ONBIT'}  # Lit by torches
+        )
+
+        self.rooms['north_south_corridor'] = Room(
+            name='north_south_corridor',
+            short_desc='North-South Corridor',
+            desc='This is a long north-south corridor. The walls are carved from solid rock.',
+            exits=[
+                Exit(Direction.NORTH, 'chasm'),
+                Exit(Direction.SOUTH, 'deep_canyon'),
+                Exit(Direction.EAST, 'torch_room'),
+            ]
+        )
+
+        self.rooms['chasm'] = Room(
+            name='chasm',
+            short_desc='Chasm',
+            desc='A chasm runs across the room from east to west. A narrow passage exits to the south.',
+            exits=[
+                Exit(Direction.NORTH, 'reservoir_south'),
+                Exit(Direction.SOUTH, 'north_south_corridor'),
+                Exit(Direction.EAST, None, "The chasm is too wide to cross."),
+                Exit(Direction.WEST, None, "The chasm is too wide to cross."),
+                Exit(Direction.DOWN, None, "It is too deep to see the bottom."),
+            ]
+        )
+
+        self.rooms['deep_canyon'] = Room(
+            name='deep_canyon',
+            short_desc='Deep Canyon',
+            desc='You are on a narrow ledge in a deep canyon. Passages exit to the north and west.',
+            exits=[
+                Exit(Direction.NORTH, 'north_south_corridor'),
+                Exit(Direction.WEST, 'reservoir_north'),
+                Exit(Direction.DOWN, None, "The canyon is too deep to climb down."),
+            ]
+        )
+
+        self.rooms['treasure_room'] = Room(
+            name='treasure_room',
+            short_desc='Treasure Room',
+            desc='This is a fabulous treasure room! Piles of gold and jewels are scattered about. '
+                 'There is a passage to the west.',
+            exits=[
+                Exit(Direction.WEST, 'stream_view'),
+            ],
+            flags={'ONBIT'}  # Naturally lit
+        )
+
+        # Machine room and coal mine
+        self.rooms['machine_room'] = Room(
+            name='machine_room',
+            short_desc='Machine Room',
+            desc='This is a large room full of assorted heavy machinery, whirring noisily. '
+                 'There is a switch on the wall and a ramp leading west and down. Another exit is to the east.',
+            exits=[
+                Exit(Direction.WEST, 'grating_room'),
+                Exit(Direction.DOWN, 'coal_mine_1'),
+                Exit(Direction.EAST, None, "The machinery blocks the way."),
+            ]
+        )
+
+        self.rooms['coal_mine_1'] = Room(
+            name='coal_mine_1',
+            short_desc='Coal Mine',
+            desc='This is a coal mine. The walls are solid coal. There are passages to the north, '
+                 'south, and east.',
+            exits=[
+                Exit(Direction.NORTH, None, "The passage is too dark to navigate."),
+                Exit(Direction.SOUTH, 'coal_mine_2'),
+                Exit(Direction.EAST, 'coal_mine_3'),
+                Exit(Direction.UP, 'machine_room'),
+            ]
+        )
+
+        self.rooms['coal_mine_2'] = Room(
+            name='coal_mine_2',
+            short_desc='Coal Mine',
+            desc='This is a coal mine. Passages exit to the north and east.',
+            exits=[
+                Exit(Direction.NORTH, 'coal_mine_1'),
+                Exit(Direction.EAST, 'coal_mine_4'),
+                Exit(Direction.SOUTH, None, "The mine shaft has collapsed here."),
+            ]
+        )
+
+        self.rooms['coal_mine_3'] = Room(
+            name='coal_mine_3',
+            short_desc='Coal Mine',
+            desc='This is a coal mine. Passages exit to the west and south.',
+            exits=[
+                Exit(Direction.WEST, 'coal_mine_1'),
+                Exit(Direction.SOUTH, 'coal_mine_4'),
+                Exit(Direction.EAST, None, "The passage is blocked by rubble."),
+            ]
+        )
+
+        self.rooms['coal_mine_4'] = Room(
+            name='coal_mine_4',
+            short_desc='Ladder Top',
+            desc='This is a small room. In the center of the room is a wooden ladder leading down '
+                 'through a hole in the floor. Passages exit to the north and west.',
+            exits=[
+                Exit(Direction.NORTH, 'coal_mine_3'),
+                Exit(Direction.WEST, 'coal_mine_2'),
+                Exit(Direction.DOWN, 'ladder_bottom'),
+            ]
+        )
+
+        self.rooms['ladder_bottom'] = Room(
+            name='ladder_bottom',
+            short_desc='Ladder Bottom',
+            desc='This is a very small room. A wooden ladder leads upward. To the south is a passageway.',
+            exits=[
+                Exit(Direction.UP, 'coal_mine_4'),
+                Exit(Direction.SOUTH, 'dead_end'),
+            ]
+        )
+
+        self.rooms['dead_end'] = Room(
+            name='dead_end',
+            short_desc='Dead End',
+            desc='This is a dead end. There is a pile of debris here and a passageway to the north.',
+            exits=[
+                Exit(Direction.NORTH, 'ladder_bottom'),
+            ]
+        )
+
+        # Maze expansion
+        self.rooms['maze_3'] = Room(
+            name='maze_3',
+            short_desc='Maze',
+            desc='You are in a maze of twisty little passages, all alike.',
+            exits=[
+                Exit(Direction.NORTH, 'maze_1'),
+                Exit(Direction.SOUTH, 'maze_4'),
+                Exit(Direction.EAST, None, "You are in a maze of twisty little passages, all alike."),
+                Exit(Direction.WEST, None, "You are in a maze of twisty little passages, all alike."),
+            ]
+        )
+
+        self.rooms['maze_4'] = Room(
+            name='maze_4',
+            short_desc='Maze',
+            desc='You are in a maze of twisty little passages, all alike.',
+            exits=[
+                Exit(Direction.NORTH, 'maze_3'),
+                Exit(Direction.SOUTH, None, "You are in a maze of twisty little passages, all alike."),
+                Exit(Direction.EAST, 'maze_5'),
+                Exit(Direction.WEST, 'maze_2'),
+            ]
+        )
+
+        self.rooms['maze_5'] = Room(
+            name='maze_5',
+            short_desc='Maze',
+            desc='You are in a maze of twisty little passages, all alike. However, one passage '
+                 'to the east seems slightly wider.',
+            exits=[
+                Exit(Direction.NORTH, None, "You are in a maze of twisty little passages, all alike."),
+                Exit(Direction.SOUTH, None, "You are in a maze of twisty little passages, all alike."),
+                Exit(Direction.EAST, 'maze_exit'),
+                Exit(Direction.WEST, 'maze_4'),
+            ]
+        )
+
+        self.rooms['maze_exit'] = Room(
+            name='maze_exit',
+            short_desc='End of Maze',
+            desc='You have reached the end of the maze! Congratulations! A passage leads west back '
+                 'into the maze and north to a small chamber.',
+            exits=[
+                Exit(Direction.WEST, 'maze_5'),
+                Exit(Direction.NORTH, None, "The passage is blocked."),
             ]
         )
 
@@ -1751,6 +2086,115 @@ class ZorkGame:
             size=8
         )
 
+        # New treasures for expanded areas
+        self.items['diamond'] = Item(
+            name='diamond',
+            desc='huge diamond',
+            synonyms=['gem', 'jewel'],
+            adjectives=['huge', 'sparkling'],
+            location='treasure_room',
+            takeable=True,
+            flags={'TAKEBIT'},
+            value=10,
+            size=5
+        )
+
+        self.items['emerald'] = Item(
+            name='emerald',
+            desc='large emerald',
+            synonyms=['gem', 'jewel'],
+            adjectives=['large', 'green'],
+            location='treasure_room',
+            takeable=True,
+            flags={'TAKEBIT'},
+            value=5,
+            size=5
+        )
+
+        self.items['ruby'] = Item(
+            name='ruby',
+            desc='glowing ruby',
+            synonyms=['gem', 'jewel'],
+            adjectives=['glowing', 'red'],
+            location='maze_exit',
+            takeable=True,
+            flags={'TAKEBIT'},
+            value=8,
+            size=5
+        )
+
+        self.items['sapphire'] = Item(
+            name='sapphire',
+            desc='beautiful sapphire',
+            synonyms=['gem', 'jewel'],
+            adjectives=['beautiful', 'blue'],
+            location='egyptian_room',
+            takeable=True,
+            flags={'TAKEBIT'},
+            value=8,
+            size=5
+        )
+
+        self.items['crown'] = Item(
+            name='crown',
+            desc='ancient crown',
+            synonyms=['coronet', 'diadem'],
+            adjectives=['ancient', 'jeweled'],
+            location='temple',
+            takeable=True,
+            flags={'TAKEBIT'},
+            value=12,
+            size=15
+        )
+
+        self.items['sceptre'] = Item(
+            name='sceptre',
+            desc='golden sceptre',
+            synonyms=['staff', 'rod', 'scepter'],
+            adjectives=['golden', 'ornate'],
+            location='reservoir_north',
+            takeable=True,
+            flags={'TAKEBIT'},
+            value=6,
+            size=18
+        )
+
+        self.items['pearl'] = Item(
+            name='pearl',
+            desc='glistening pearl',
+            synonyms=['gem'],
+            adjectives=['glistening', 'white'],
+            location='stream',
+            takeable=True,
+            flags={'TAKEBIT'},
+            value=4,
+            size=3
+        )
+
+        self.items['coal'] = Item(
+            name='coal',
+            desc='lump of coal',
+            synonyms=['lump'],
+            adjectives=['black'],
+            location='coal_mine_4',
+            takeable=True,
+            flags={'TAKEBIT'},
+            value=1,
+            size=5
+        )
+
+        self.items['bracelet'] = Item(
+            name='bracelet',
+            desc='silver bracelet',
+            synonyms=['armband', 'bangle'],
+            adjectives=['silver', 'ornate'],
+            location='dead_end',
+            takeable=True,
+            flags={'TAKEBIT'},
+            value=7,
+            size=6
+        )
+
         # NPCs
         self.items['troll'] = Item(
             name='troll',
@@ -1846,6 +2290,16 @@ class ZorkGame:
         self.rooms['maze_1'].items.append('coins')
         self.rooms['round_room'].items.append('knife')
         self.rooms['slide_room'].items.append('shovel')
+
+        # New treasure locations in expanded areas
+        self.rooms['treasure_room'].items.extend(['diamond', 'emerald'])
+        self.rooms['maze_exit'].items.append('ruby')
+        self.rooms['egyptian_room'].items.append('sapphire')
+        self.rooms['temple'].items.append('crown')
+        self.rooms['reservoir_north'].items.append('sceptre')
+        self.rooms['stream'].items.append('pearl')
+        self.rooms['coal_mine_4'].items.append('coal')
+        self.rooms['dead_end'].items.append('bracelet')
 
     def get_current_room(self) -> Room:
         """Get the current room object"""

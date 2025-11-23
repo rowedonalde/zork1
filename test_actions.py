@@ -532,7 +532,7 @@ class TestContentIntegration(TestBaseActionClasses):
     def test_room_count(self):
         """Test that expected number of rooms exist"""
         total_rooms = len(self.game.rooms)
-        self.assertGreaterEqual(total_rooms, 31)
+        self.assertGreaterEqual(total_rooms, 57, f"Expected at least 57 rooms, got {total_rooms}")
 
     def test_object_counts(self):
         """Test object and treasure counts"""
@@ -541,9 +541,9 @@ class TestContentIntegration(TestBaseActionClasses):
         treasures = sum(1 for item in self.game.items.values()
                        if 'TAKEBIT' in item.flags and item.value > 0)
 
-        self.assertGreaterEqual(total_objects, 21)
-        self.assertGreaterEqual(takeable_objects, 15)
-        self.assertGreaterEqual(treasures, 10)
+        self.assertGreaterEqual(total_objects, 30, f"Expected at least 30 objects, got {total_objects}")
+        self.assertGreaterEqual(takeable_objects, 23, f"Expected at least 23 takeable objects, got {takeable_objects}")
+        self.assertGreaterEqual(treasures, 18, f"Expected at least 18 treasures, got {treasures}")
 
     def test_new_treasure_definitions(self):
         """Test that new treasures are properly defined"""
@@ -561,8 +561,8 @@ class TestContentIntegration(TestBaseActionClasses):
                         if 'TAKEBIT' in item.flags and item.value > 0]
         total_value = sum(t.value for t in all_treasures)
 
-        self.assertGreaterEqual(total_value, 62)
-        self.assertGreaterEqual(len(all_treasures), 10)
+        self.assertGreaterEqual(total_value, 123, f"Expected at least 123 points, got {total_value}")
+        self.assertGreaterEqual(len(all_treasures), 18, f"Expected at least 18 treasures, got {len(all_treasures)}")
 
 
 if __name__ == '__main__':
