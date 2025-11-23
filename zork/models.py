@@ -121,6 +121,7 @@ class GameState:
             'trap_door_open': False,
             'grate_revealed': False,
             'grating_open': False,
+            'grating_unlocked': False,
             'troll_flag': False,
             'won_flag': False,
             'magic_flag': False,

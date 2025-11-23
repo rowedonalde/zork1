@@ -440,8 +440,23 @@ class ZorkGame:
             print(f"You can't lock the {item.desc}.")
             return
 
+        # Handle grating specifically
+        if item.name == 'grating':
+            if self.state.current_room == 'grating_clearing':
+                print("You can't lock it from this side.")
+                return
+
+            if self.state.current_room == 'grating_room':
+                if not self.state.flags.get('grating_unlocked', False):
+                    print("The grating is already locked.")
+                    return
+
+                self.state.flags['grating_unlocked'] = False
+                self.state.flags['grating_open'] = False
+                print("The grating is locked.")
+                return
+
         # Default behavior - most things can't be locked
-        # (Specific items like grate can override this later)
         print("It doesn't seem to work.")
 
     def do_unlock(self, obj_name: str, key_name: str):
@@ -461,8 +476,40 @@ class ZorkGame:
             print(f"You can't unlock the {item.desc}.")
             return
 
+        # Check if we have the required key
+        if not key_name:
+            print("Unlock it with what?")
+            return
+
+        key_item = self.find_item(key_name)
+        if not key_item:
+            print(f"You don't see any {key_name} here.")
+            return
+
+        if key_item.location != 'inventory':
+            print(f"You're not holding the {key_item.desc}.")
+            return
+
+        # Handle grating specifically
+        if item.name == 'grating':
+            if self.state.current_room == 'grating_clearing':
+                print("You can't reach the lock from here.")
+                return
+
+            if self.state.current_room == 'grating_room':
+                if key_item.name == 'skeleton_key':
+                    if self.state.flags.get('grating_unlocked', False):
+                        print("The grating is already unlocked.")
+                        return
+
+                    self.state.flags['grating_unlocked'] = True
+                    print("The grating is unlocked.")
+                    return
+                else:
+                    print(f"The {key_item.desc} doesn't fit the lock.")
+                    return
+
         # Default behavior - most things can't be unlocked
-        # (Specific items like grate can override this later)
         print("It doesn't seem to work.")
 
     def execute_command(self, command: str):

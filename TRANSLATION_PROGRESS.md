@@ -3,13 +3,13 @@
 ## Phase 2 Status: In Progress ✅
 
 ### Code Statistics
-- **Lines of Python:** 2,300+ lines
-- **Verb commands:** 24 implemented
+- **Lines of Python:** 2,400+ lines
+- **Verb commands:** 26 implemented (added lock/unlock)
 - **Rooms:** 57/110 (52%)
-- **Objects:** 30/138 (22%)
+- **Objects:** 32/138 (23%) - added skeleton key and grating door
 - **Treasures:** 19 treasures worth 123 points
-- **Systems:** 6/12 major systems
-- **Tests:** 51 automated tests, all passing
+- **Systems:** 7/12 major systems
+- **Tests:** 61 automated tests, all passing
 
 ---
 
@@ -122,6 +122,35 @@ The troll's body dissolves into a cloud of greasy black smoke.
 [passage now open]
 ```
 
+### 7. Lock & Key System
+**Status:** WORKING ✅
+
+**Features:**
+- Skeleton key located in maze_5
+- Grating door with DOORBIT flag
+- `unlock <door> with <key>` command
+- `lock <door>` command
+- Grating can only be unlocked from grating_room (underground side)
+- Grating can only be locked from grating_room
+- Must unlock grating before opening it
+- Lock state tracked separately from open state
+- Proper validation (correct key required, must be holding key)
+
+**Test Results:**
+```
+> open grating
+The grating is locked.
+
+> unlock grating with skeleton key
+The grating is unlocked.
+
+> open grating
+The grating opens to reveal trees above you.
+
+> lock grating
+The grating is locked.
+```
+
 ---
 
 ## 🎮 Implemented Commands (24)
@@ -152,8 +181,8 @@ The troll's body dissolves into a cloud of greasy black smoke.
 
 ### Utility
 - `wait/z` - Pass time
-- `lock <object> with <key>` - Lock doors/containers (limited)
-- `unlock <object> with <key>` - Unlock doors/containers (limited)
+- `lock <object>` - Lock doors (grating implemented)
+- `unlock <object> with <key>` - Unlock doors with correct key
 
 ### Meta Commands
 - `look/l` - Look around
@@ -268,7 +297,7 @@ The troll's body dissolves into a cloud of greasy black smoke.
 
 ---
 
-## 📦 Implemented Objects (30)
+## 📦 Implemented Objects (32)
 
 ### Treasures (19 items - 123 points total)
 **Original Treasures:**
@@ -292,26 +321,28 @@ The troll's body dissolves into a cloud of greasy black smoke.
 16. **Coal** - Lump of coal (1 pt) - coal_mine_4
 17. **Bracelet** - Silver bracelet (7 pts) - dead_end
 
-### Tools & Utility Items (5 items)
+### Tools & Utility Items (6 items)
 18. **Rope** - Hemp rope - attic
 19. **Bottle** - Glass bottle (container) - kitchen
 20. **Shovel** - Sturdy shovel - slide_room
 21. **Axe** - Bloody axe (weapon, 3 pts) - dropped by troll
+22. **Skeleton Key** - Skeleton key (TOOLBIT) - maze_5
 
-### Interactive Items (4 items)
-22. **Mailbox** - Contains leaflet (CONTBIT)
-23. **Leaflet** - Welcome message (TAKEBIT)
-24. **Lantern** - Brass lantern (TAKEBIT, LIGHTBIT)
-25. **Sword** - Elvish sword (TAKEBIT, WEAPONBIT)
-26. **Rug** - Large oriental rug (reveals trap door)
-27. **Trophy Case** - Container for treasures, awards points (CONTBIT)
+### Interactive Items (5 items)
+23. **Mailbox** - Contains leaflet (CONTBIT)
+24. **Leaflet** - Welcome message (TAKEBIT)
+25. **Lantern** - Brass lantern (TAKEBIT, LIGHTBIT)
+26. **Sword** - Elvish sword (TAKEBIT, WEAPONBIT)
+27. **Rug** - Large oriental rug (reveals trap door)
+28. **Trophy Case** - Container for treasures, awards points (CONTBIT)
 
 ### NPCs (1 item)
-28. **Troll** - Nasty troll that blocks passages (ACTORBIT)
+29. **Troll** - Nasty troll that blocks passages (ACTORBIT)
 
-### Scenery/Portals (2 items)
-29. **Tree** - Large tree in forest path (climbable)
-30. **Trap Door** - Hidden under rug (NDESCBIT initially)
+### Scenery/Portals (3 items)
+30. **Tree** - Large tree in forest path (climbable)
+31. **Trap Door** - Hidden under rug (NDESCBIT initially)
+32. **Grating** - Metal grating door (DOORBIT, lockable with skeleton key)
 
 ---
 
@@ -339,10 +370,10 @@ The troll's body dissolves into a cloud of greasy black smoke.
 | Component | Implemented | Total | Percentage |
 |-----------|-------------|-------|------------|
 | Rooms | **57** | 110 | **52%** |
-| Objects | **30** | 138 | **22%** |
+| Objects | **32** | 138 | **23%** |
 | Treasures | **19** | ~60 | **32%** |
-| Verbs | 24 | ~60 | 40% |
-| Major Systems | 6 | ~12 | 50% |
+| Verbs | 26 | ~60 | 43% |
+| Major Systems | 7 | ~12 | 58% |
 
 ---
 
@@ -358,14 +389,16 @@ The troll's body dissolves into a cloud of greasy black smoke.
 - ✅ Coal mine network (8 rooms)
 - ✅ 9 new treasures (61 points)
 - ✅ Action refactoring (open/close)
-- ✅ Comprehensive test suite (51 tests)
+- ✅ **Lock & Key System - grating puzzle with skeleton key**
+- ✅ Comprehensive test suite (61 tests, +10 for lock/unlock)
 
 ### Critical Path Items
-1. **Key/Lock Mechanics** (Priority: HIGH)
-   - Implement real locking (currently just prints "doesn't work")
-   - Add keys (rusty key, skeleton key)
-   - Grating puzzle (locked, needs key)
-   - Door unlocking
+1. ~~**Key/Lock Mechanics**~~ ✅ COMPLETED
+   - ✅ Implement real locking system
+   - ✅ Skeleton key in maze_5
+   - ✅ Grating puzzle (locked, needs key)
+   - ✅ Door unlocking with proper validation
+   - ✅ 10 automated tests for lock/unlock
 
 2. **Core Systems** (Priority: HIGH)
    - Lamp battery countdown (currently infinite)
@@ -443,7 +476,6 @@ The troll's body dissolves into a cloud of greasy black smoke.
 - [ ] Lamp battery countdown (currently infinite)
 - [ ] Low battery warnings
 - [ ] Grue attack (death from dark)
-- [ ] Real lock/unlock mechanics (currently placeholder)
 - [ ] Thief NPC AI
 - [ ] Save/restore game state
 - [ ] Death and respawn system
@@ -455,6 +487,7 @@ The troll's body dissolves into a cloud of greasy black smoke.
 - ✅ Trophy case scoring
 - ✅ NPC blocking passages
 - ✅ Item drops on NPC death
+- ✅ Lock/unlock mechanics with keys
 
 ---
 
@@ -468,4 +501,4 @@ The troll's body dissolves into a cloud of greasy black smoke.
 - **Treasures added this session:** +9 treasures (61 points)
 - **Tests:** 51 automated tests, all passing
 
-**Bottom Line:** MAJOR MILESTONE ACHIEVED! Game is now over 50% playable with a massive interconnected underground dungeon. Players can explore 57 rooms, collect 19 treasures worth 123 points, solve a maze, defeat a troll, and discover temple treasures. Core action system fully refactored with comprehensive test coverage.
+**Bottom Line:** MAJOR MILESTONE ACHIEVED! Game is now over 50% playable with a massive interconnected underground dungeon. Players can explore 57 rooms, collect 19 treasures worth 123 points, solve a maze, defeat a troll, discover temple treasures, and unlock the grating puzzle with the skeleton key. Lock/key system fully implemented with 10 comprehensive tests. Core action system fully refactored with 61 passing tests.

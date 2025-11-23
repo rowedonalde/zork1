@@ -1101,6 +1101,27 @@ def initialize_world(game):
         size=20
     )
 
+    game.items['skeleton_key'] = Item(
+        name='skeleton_key',
+        desc='skeleton key',
+        synonyms=['key', 'keys'],
+        adjectives=['skeleton', 'old'],
+        location='maze_5',
+        takeable=True,
+        flags={'TAKEBIT', 'TOOLBIT'},
+        size=10
+    )
+
+    # Door objects
+    game.items['grating'] = Item(
+        name='grating',
+        desc='grating',
+        synonyms=['grate', 'bars'],
+        adjectives=['metal', 'iron'],
+        location='grating_clearing',
+        flags={'DOORBIT', 'NDESCBIT'}
+    )
+
     # Add items to rooms
     game.rooms['west_of_house'].items.append('mailbox')
     game.rooms['living_room'].items.extend(['sword', 'lantern', 'rug', 'trap_door', 'trophy_case', 'jewels'])
@@ -1109,6 +1130,8 @@ def initialize_world(game):
     game.rooms['path'].items.append('tree')
     game.rooms['attic'].items.append('rope')
     game.rooms['kitchen'].items.append('bottle')
+    game.rooms['grating_clearing'].items.append('grating')
+    game.rooms['grating_room'].items.append('grating')  # Grating visible from both sides
 
     # Underground treasure locations
     game.rooms['loud_room'].items.append('platinum_bar')
@@ -1128,4 +1151,5 @@ def initialize_world(game):
     game.rooms['stream'].items.append('pearl')
     game.rooms['coal_mine_4'].items.append('coal')
     game.rooms['dead_end'].items.append('bracelet')
+    game.rooms['maze_5'].items.append('skeleton_key')
 

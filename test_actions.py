@@ -565,5 +565,100 @@ class TestContentIntegration(TestBaseActionClasses):
         self.assertGreaterEqual(len(all_treasures), 18, f"Expected at least 18 treasures, got {len(all_treasures)}")
 
 
+class TestLockUnlockMechanics(TestBaseActionClasses):
+    """Test lock and unlock functionality"""
+
+    def test_skeleton_key_exists(self):
+        """Test skeleton key is in maze_5"""
+        skeleton_key = self.game.items.get('skeleton_key')
+        self.assertIsNotNone(skeleton_key, "skeleton_key not found")
+        self.assertEqual(skeleton_key.location, 'maze_5')
+        self.assertIn('TAKEBIT', skeleton_key.flags)
+        self.assertIn('TOOLBIT', skeleton_key.flags)
+
+    def test_grating_exists(self):
+        """Test grating object is defined"""
+        grating = self.game.items.get('grating')
+        self.assertIsNotNone(grating, "grating not found")
+        self.assertEqual(grating.location, 'grating_clearing')
+        self.assertIn('DOORBIT', grating.flags)
+
+    def test_grating_starts_locked(self):
+        """Test grating starts in locked state"""
+        self.assertFalse(self.game.state.flags.get('grating_unlocked', False))
+        self.assertFalse(self.game.state.flags.get('grating_open', False))
+
+    def test_open_locked_grating_fails(self):
+        """Test opening grating when locked fails"""
+        self.game.state.current_room = 'grating_clearing'
+        output = self.capture_output(lambda: self.game.do_open('grating'))
+        self.assertIn('locked', output.lower())
+        self.assertFalse(self.game.state.flags.get('grating_open', False))
+
+    def test_unlock_grating_without_key(self):
+        """Test unlocking grating without key fails"""
+        self.game.state.current_room = 'grating_room'
+        output = self.capture_output(lambda: self.game.do_unlock('grating', 'key'))
+        # Should fail because we don't have the key
+        self.assertIn('don\'t see', output.lower())
+
+    def test_unlock_grating_with_key(self):
+        """Test unlocking grating with skeleton key works"""
+        # Get the key from maze_5
+        self.game.state.current_room = 'maze_5'
+        self.game.do_take('skeleton_key')
+        self.assertIn('skeleton_key', self.game.state.inventory)
+
+        # Go to grating room
+        self.game.state.current_room = 'grating_room'
+
+        # Unlock the grating
+        output = self.capture_output(lambda: self.game.do_unlock('grating', 'skeleton_key'))
+        self.assertIn('unlocked', output.lower())
+        self.assertTrue(self.game.state.flags.get('grating_unlocked', False))
+
+    def test_open_unlocked_grating(self):
+        """Test opening grating after unlocking works"""
+        # Setup: unlock the grating
+        self.game.state.current_room = 'maze_5'
+        self.game.do_take('skeleton_key')
+        self.game.state.current_room = 'grating_room'
+        self.game.do_unlock('grating', 'skeleton_key')
+
+        # Now open it
+        output = self.capture_output(lambda: self.game.do_open('grating'))
+        self.assertIn('open', output.lower())
+        self.assertTrue(self.game.state.flags.get('grating_open', False))
+
+    def test_cannot_unlock_from_wrong_side(self):
+        """Test unlocking grating from clearing side fails"""
+        self.game.state.current_room = 'maze_5'
+        self.game.do_take('skeleton_key')
+        self.game.state.current_room = 'grating_clearing'
+
+        output = self.capture_output(lambda: self.game.do_unlock('grating', 'skeleton_key'))
+        self.assertIn('reach', output.lower())
+
+    def test_lock_grating_after_unlock(self):
+        """Test locking grating after unlocking"""
+        # Setup: unlock the grating
+        self.game.state.current_room = 'maze_5'
+        self.game.do_take('skeleton_key')
+        self.game.state.current_room = 'grating_room'
+        self.game.do_unlock('grating', 'skeleton_key')
+
+        # Lock it again
+        output = self.capture_output(lambda: self.game.do_lock('grating', 'skeleton_key'))
+        self.assertIn('locked', output.lower())
+        self.assertFalse(self.game.state.flags.get('grating_unlocked', False))
+        self.assertFalse(self.game.state.flags.get('grating_open', False))
+
+    def test_cannot_lock_from_clearing_side(self):
+        """Test locking from clearing side fails"""
+        self.game.state.current_room = 'grating_clearing'
+        output = self.capture_output(lambda: self.game.do_lock('grating', None))
+        self.assertIn('side', output.lower())
+
+
 if __name__ == '__main__':
     unittest.main()

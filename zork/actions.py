@@ -1009,6 +1009,34 @@ class OpenCloseAction(BaseAction):
                     self.game.state.flags['trap_door_open'] = False
             return
 
+        # Special case: Grating
+        if item.name == 'grating':
+            if self.is_opening:
+                # Check if it's unlocked first
+                if not self.game.state.flags.get('grating_unlocked', False):
+                    if self.game.state.current_room == 'grating_clearing':
+                        print("Above you is a grating locked with a skull-and-crossbones lock.")
+                    else:
+                        print("The grating is locked.")
+                    return
+
+                if self.game.state.flags['grating_open']:
+                    print("It's already open.")
+                else:
+                    if self.game.state.current_room == 'grating_clearing':
+                        print("The grating opens.")
+                    else:
+                        print("The grating opens to reveal trees above you.")
+                    self.game.state.flags['grating_open'] = True
+            else:
+                # Closing
+                if not self.game.state.flags['grating_open']:
+                    print("It's already closed.")
+                else:
+                    print("The grating is closed.")
+                    self.game.state.flags['grating_open'] = False
+            return
+
         # Generic items - check if they can be opened/closed
         if self.is_opening:
             # Opening generic item
