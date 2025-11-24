@@ -660,5 +660,129 @@ class TestLockUnlockMechanics(TestBaseActionClasses):
         self.assertIn('side', output.lower())
 
 
+class TestLampBatteryCountdown(unittest.TestCase):
+    """Test suite for lamp battery countdown system"""
+
+    def setUp(self):
+        """Create a fresh game instance for each test"""
+        self.game = ZorkGame()
+        self.game.state.current_room = 'west_of_house'
+        # Take the lantern
+        self.game.state.current_room = 'living_room'
+        self.game.do_take('lantern')
+        # Turn it on
+        self.game.do_turn_on('lantern')
+        self.game.state.current_room = 'cellar'
+
+    def capture_output(self, func):
+        """Capture stdout from a function call"""
+        old_stdout = sys.stdout
+        sys.stdout = StringIO()
+        try:
+            func()
+            return sys.stdout.getvalue()
+        finally:
+            sys.stdout = old_stdout
+
+    def test_battery_countdown_when_on(self):
+        """Test battery decrements when lamp is on"""
+        initial_battery = self.game.state.lamp_battery
+        self.game.update_lamp_battery()
+        self.assertEqual(self.game.state.lamp_battery, initial_battery - 1)
+
+    def test_no_countdown_when_off(self):
+        """Test battery doesn't decrement when lamp is off"""
+        self.game.do_turn_off('lantern')
+        initial_battery = self.game.state.lamp_battery
+        self.game.update_lamp_battery()
+        self.assertEqual(self.game.state.lamp_battery, initial_battery)
+
+    def test_countdown_when_in_room(self):
+        """Test battery decrements when lamp is on and in current room (matching ZIL)"""
+        # Drop the lantern in current room - should still consume battery (matches ZIL LIGHT-INT)
+        self.game.do_drop('lantern')
+        initial_battery = self.game.state.lamp_battery
+        self.game.update_lamp_battery()
+        # Battery should still decrement because lamp is in HERE
+        self.assertEqual(self.game.state.lamp_battery, initial_battery - 1)
+
+    def test_countdown_when_lamp_elsewhere(self):
+        """Test battery decrements even when lamp is in another room (matching ZIL I-LANTERN)"""
+        # Put lamp in a different room while still on
+        lantern = self.game.items.get('lantern')
+        lantern.location = 'living_room'  # Different from current room (cellar)
+        self.game.state.current_room = 'cellar'
+
+        initial_battery = self.game.state.lamp_battery
+        self.game.update_lamp_battery()
+        # Battery should still decrement (I-LANTERN runs regardless of location)
+        self.assertEqual(self.game.state.lamp_battery, initial_battery - 1)
+
+    def test_warning_at_100_turns(self):
+        """Test warning message at 100 turns remaining (matching ZIL)"""
+        self.game.state.lamp_battery = 101
+        output = self.capture_output(lambda: self.game.update_lamp_battery())
+        self.assertIn('bit dimmer', output.lower())
+        self.assertEqual(self.game.state.lamp_battery, 100)
+
+    def test_warning_at_70_turns(self):
+        """Test warning message at 70 turns remaining (matching ZIL)"""
+        self.game.state.lamp_battery = 71
+        output = self.capture_output(lambda: self.game.update_lamp_battery())
+        self.assertIn('definitely dimmer', output.lower())
+        self.assertEqual(self.game.state.lamp_battery, 70)
+
+    def test_warning_at_15_turns(self):
+        """Test warning message at 15 turns remaining (matching ZIL)"""
+        self.game.state.lamp_battery = 16
+        output = self.capture_output(lambda: self.game.update_lamp_battery())
+        self.assertIn('nearly out', output.lower())
+        self.assertEqual(self.game.state.lamp_battery, 15)
+
+    def test_lamp_goes_out_at_zero(self):
+        """Test lamp turns off when battery reaches 0 (matching ZIL)"""
+        self.game.state.lamp_battery = 1
+        output = self.capture_output(lambda: self.game.update_lamp_battery())
+        self.assertIn('better have more light', output.lower())
+        self.assertEqual(self.game.state.lamp_battery, 0)
+        lantern = self.game.items.get('lantern')
+        self.assertNotIn('ONBIT', lantern.flags)
+
+    def test_pitch_black_message_when_lamp_dies(self):
+        """Test 'pitch black' message appears when lamp dies in dark room"""
+        # Make sure we're in a naturally dark room
+        self.game.state.current_room = 'cellar'
+        self.game.state.lamp_battery = 1
+        output = self.capture_output(lambda: self.game.update_lamp_battery())
+        self.assertIn('pitch black', output.lower())
+
+    def test_battery_countdown_on_move(self):
+        """Test battery decrements when moving"""
+        initial_battery = self.game.state.lamp_battery
+        self.game.state.current_room = 'living_room'
+        # Suppress do_look output by capturing it
+        self.capture_output(lambda: self.game.do_go('east'))
+        self.assertEqual(self.game.state.lamp_battery, initial_battery - 1)
+        self.assertEqual(self.game.state.current_room, 'kitchen')
+
+    def test_battery_countdown_on_wait(self):
+        """Test battery decrements when waiting"""
+        initial_battery = self.game.state.lamp_battery
+        self.capture_output(lambda: self.game.do_wait())
+        self.assertEqual(self.game.state.lamp_battery, initial_battery - 1)
+
+    def test_cannot_turn_on_dead_lantern(self):
+        """Test that lantern cannot be turned on when battery is dead (matching ZIL)"""
+        # Drain the battery
+        self.game.state.lamp_battery = 0
+        lantern = self.game.items.get('lantern')
+        lantern.flags.discard('ONBIT')
+
+        # Try to turn it on
+        output = self.capture_output(lambda: self.game.do_turn_on('lantern'))
+        self.assertIn('burned-out', output.lower())
+        self.assertNotIn('ONBIT', lantern.flags)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -3,13 +3,13 @@
 ## Phase 2 Status: In Progress ✅
 
 ### Code Statistics
-- **Lines of Python:** 2,400+ lines
+- **Lines of Python:** 2,450+ lines
 - **Verb commands:** 26 implemented (added lock/unlock)
 - **Rooms:** 57/110 (52%)
 - **Objects:** 32/138 (23%) - added skeleton key and grating door
 - **Treasures:** 19 treasures worth 123 points
-- **Systems:** 7/12 major systems
-- **Tests:** 61 automated tests, all passing
+- **Systems:** 8/12 major systems (added lamp battery countdown)
+- **Tests:** 73 automated tests, all passing (+12 for battery system)
 
 ---
 
@@ -149,6 +149,51 @@ The grating opens to reveal trees above you.
 
 > lock grating
 The grating is locked.
+```
+
+### 8. Lamp Battery Countdown
+**Status:** WORKING ✅ (Matches original ZIL exactly)
+
+**Features:**
+- Battery starts at 330 turns
+- Decrements every turn when lamp is on (regardless of location)
+- Messages shown only when lamp is held or in current room
+- No countdown when lamp is off
+- Warning at 100 turns: "The lamp appears a bit dimmer."
+- Warning at 70 turns: "The lamp is definitely dimmer now."
+- Warning at 15 turns: "The lamp is nearly out."
+- At 0 turns: Lamp automatically turns off
+- Cannot relight dead lamp: "A burned-out lamp won't light."
+- "It is now pitch black" message when entering darkness
+- Integrates with existing light/darkness system
+
+**Test Results (matching original ZIL LAMP-TABLE):**
+```
+> wait
+Time passes...
+The lamp appears a bit dimmer.
+
+[... 30 turns later ...]
+
+> wait
+Time passes...
+The lamp is definitely dimmer now.
+
+[... 55 turns later ...]
+
+> wait
+Time passes...
+The lamp is nearly out.
+
+[... 15 turns later ...]
+
+> wait
+Time passes...
+You'd better have more light than from the brass lantern.
+It is now pitch black.
+
+> turn on lantern
+A burned-out lamp won't light.
 ```
 
 ---
@@ -373,7 +418,7 @@ The grating is locked.
 | Objects | **32** | 138 | **23%** |
 | Treasures | **19** | ~60 | **32%** |
 | Verbs | 26 | ~60 | 43% |
-| Major Systems | 7 | ~12 | 58% |
+| Major Systems | 8 | ~12 | 67% |
 
 ---
 
@@ -390,7 +435,8 @@ The grating is locked.
 - ✅ 9 new treasures (61 points)
 - ✅ Action refactoring (open/close)
 - ✅ **Lock & Key System - grating puzzle with skeleton key**
-- ✅ Comprehensive test suite (61 tests, +10 for lock/unlock)
+- ✅ **Lamp Battery Countdown - 330 turns, ZIL-accurate (warnings at 100, 70, 15)**
+- ✅ Comprehensive test suite (73 tests, +12 for battery system)
 
 ### Critical Path Items
 1. ~~**Key/Lock Mechanics**~~ ✅ COMPLETED
@@ -400,23 +446,31 @@ The grating is locked.
    - ✅ Door unlocking with proper validation
    - ✅ 10 automated tests for lock/unlock
 
-2. **Core Systems** (Priority: HIGH)
-   - Lamp battery countdown (currently infinite)
+2. ~~**Lamp Battery Countdown**~~ ✅ COMPLETED
+   - ✅ Battery starts at 330 turns
+   - ✅ Countdown when lamp is on (regardless of location)
+   - ✅ Warning messages at 100, 70, and 15 turns (matching ZIL exactly)
+   - ✅ Lamp turns off automatically at 0
+   - ✅ Cannot relight dead lamp
+   - ✅ Integration with light/darkness system
+   - ✅ 12 automated tests for battery system
+
+3. **Core Systems** (Priority: HIGH)
    - Grue death (being in dark too long kills you)
    - Save/restore game
    - Death and respawn
 
-3. **NPC Enhancement** (Priority: MEDIUM)
+4. **NPC Enhancement** (Priority: MEDIUM)
    - Thief AI (randomly appears, steals treasures)
    - Thief's treasure stash
    - Combat with thief
 
-4. **Puzzle Elements** (Priority: MEDIUM)
+5. **Puzzle Elements** (Priority: MEDIUM)
    - Basket/pulley system
    - Dam controls and water puzzles
    - Rope bridges across chasms
 
-5. **More Content** (Priority: LOW)
+6. **More Content** (Priority: LOW)
    - Additional rooms (target: 70+)
    - More treasures and puzzles
    - Secret passages
@@ -442,13 +496,15 @@ The grating is locked.
 - ✅ Container system (take from/put in)
 - ✅ Open/close mechanics
 - ✅ NPC combat and item drops
+- ✅ Lock/key mechanics (grating puzzle)
+- ✅ Lamp battery countdown (330 turns with warnings)
 
 **Next Milestone:** ~70% playable
 - Target: 70-80 rooms
-- Implement key/lock mechanics
-- Add lamp battery countdown
+- Implement grue death system
 - Implement thief NPC
 - Add more puzzles (dam controls, rope bridges)
+- Death and respawn system
 
 ---
 
@@ -456,10 +512,11 @@ The grating is locked.
 
 ### What Worked Well
 1. **Action class hierarchy** - Eliminated massive code duplication
-2. **Automated testing** - 51 tests catch regressions instantly
+2. **Automated testing** - 73 tests catch regressions instantly
 3. **Incremental content expansion** - Added 26 rooms in organized batches
 4. **Test-driven development** - Updated tests as we added content
 5. **Dataclasses & type hints** - Clean, maintainable code structure
+6. **ZIL source matching** - Verified exact behavior against original (thresholds, messages)
 
 ### Improvements Made
 - Action refactoring reduced 250+ lines to ~50 lines of reusable classes
@@ -473,8 +530,6 @@ The grating is locked.
 ## 🐛 Known Issues / TODO
 
 ### Missing Systems
-- [ ] Lamp battery countdown (currently infinite)
-- [ ] Low battery warnings
 - [ ] Grue attack (death from dark)
 - [ ] Thief NPC AI
 - [ ] Save/restore game state
@@ -488,17 +543,19 @@ The grating is locked.
 - ✅ NPC blocking passages
 - ✅ Item drops on NPC death
 - ✅ Lock/unlock mechanics with keys
+- ✅ Lamp battery countdown (330 turns with warnings at 100, 70, 15)
+- ✅ Low battery warnings matching original ZIL exactly
 
 ---
 
 ## 📝 Notes
 
 - **Original ZIL:** ~12,000 lines
-- **Current Python:** ~2,300 lines
+- **Current Python:** ~2,450 lines
 - **Ratio:** ~5:1 compression (Python is more concise)
-- **Lines of code growth:** 1,450 → 2,300 (58% increase)
+- **Lines of code growth:** 1,450 → 2,450 (69% increase)
 - **Rooms added this session:** +37 rooms (26 new + 11 from before)
 - **Treasures added this session:** +9 treasures (61 points)
-- **Tests:** 51 automated tests, all passing
+- **Tests:** 73 automated tests, all passing (+12 for battery system)
 
-**Bottom Line:** MAJOR MILESTONE ACHIEVED! Game is now over 50% playable with a massive interconnected underground dungeon. Players can explore 57 rooms, collect 19 treasures worth 123 points, solve a maze, defeat a troll, discover temple treasures, and unlock the grating puzzle with the skeleton key. Lock/key system fully implemented with 10 comprehensive tests. Core action system fully refactored with 61 passing tests.
+**Bottom Line:** MAJOR MILESTONE ACHIEVED! Game is now over 50% playable with a massive interconnected underground dungeon. Players can explore 57 rooms, collect 19 treasures worth 123 points, solve a maze, defeat a troll, discover temple treasures, and unlock the grating puzzle with the skeleton key. Lock/key system fully implemented with 10 comprehensive tests. **NEW: Lamp battery countdown system (330 turns) matching original ZIL exactly (warnings at 100, 70, 15 turns) - adds real time pressure to exploration!** Core action system fully refactored with 73 passing tests.

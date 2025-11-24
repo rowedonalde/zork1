@@ -57,6 +57,50 @@ class ZorkGame:
 
         return False
 
+    def update_lamp_battery(self):
+        """Update lamp battery and show warnings
+
+        Called each turn to:
+        - Decrement battery if lamp is on
+        - Show warnings at thresholds (100, 70, 15 - matching original ZIL)
+        - Turn off lamp when battery reaches 0
+        """
+        # Find the lantern
+        lantern = self.items.get('lantern')
+        if not lantern:
+            return
+
+        # Only consume battery if lamp is on (matching ZIL I-LANTERN behavior)
+        if 'ONBIT' in lantern.flags and 'LIGHTBIT' in lantern.flags:
+            # Decrement battery
+            self.state.lamp_battery -= 1
+
+            # Check if lamp is held or in current room for showing messages (matching ZIL LIGHT-INT)
+            show_messages = (lantern.location == 'inventory' or
+                           lantern.location == self.state.current_room)
+
+            # Check for warnings at specific thresholds (matching original ZIL LAMP-TABLE)
+            if show_messages:
+                if self.state.lamp_battery == 100:
+                    print("\nThe lamp appears a bit dimmer.")
+                elif self.state.lamp_battery == 70:
+                    print("\nThe lamp is definitely dimmer now.")
+                elif self.state.lamp_battery == 15:
+                    print("\nThe lamp is nearly out.")
+                elif self.state.lamp_battery == 0:
+                    print("\nYou'd better have more light than from the brass lantern.")
+
+            # Lamp runs out at 0 regardless of location
+            if self.state.lamp_battery == 0:
+                lantern.flags.discard('ONBIT')
+
+                # Update room lighting
+                was_lit = self.state.lit
+                self.state.lit = self.is_room_lit()
+
+                if was_lit and not self.state.lit:
+                    print("It is now pitch black.")
+
     def find_item(self, word: str, include_hidden: bool = True) -> Optional[Item]:
         """Find an item by name in current room or inventory"""
         room = self.get_current_room()
@@ -195,6 +239,7 @@ class ZorkGame:
 
         self.state.current_room = exit.destination
         self.state.moves += 1
+        self.update_lamp_battery()
         self.do_look()
 
     def do_take(self, obj_name: str, _=None):
@@ -402,6 +447,7 @@ class ZorkGame:
         """Wait - pass time"""
         print("Time passes...")
         self.state.moves += 1
+        self.update_lamp_battery()
 
     def do_close(self, obj_name: str, _=None):
         """Close a door, window, or container"""

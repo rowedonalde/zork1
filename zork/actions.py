@@ -150,6 +150,12 @@ class TurnOnOffAction(BaseAction):
             if is_on:
                 print("It is already on.")
                 return
+
+            # Check if this is the lantern and battery is dead (matching ZIL LANTERN routine)
+            if item.name == 'lantern' and self.game.state.lamp_battery <= 0:
+                print("A burned-out lamp won't light.")
+                return
+
             item.flags.add('ONBIT')
             print(f"The {item.desc} is now on.")
         else:
