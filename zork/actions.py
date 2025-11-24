@@ -23,14 +23,15 @@ class BaseAction:
     indirect_object: Optional[str] = None
 
     @staticmethod
-    def from_command(command: str, game: 'ZorkGame') -> 'BaseAction':
+    def from_command(command: str, game: 'ZorkGame', **kwargs) -> 'BaseAction':  # type: ignore[misc]
         """
         Factory method to create action from command string
 
         `command` is the full user input command, e.g. "take sword from chest".
+        `**kwargs` allows subclasses to accept additional parameters (e.g., turn_on, is_opening).
 
         Example:
-            def from_command(command: str, game: 'ZorkGame') -> 'SomeAction':
+            def from_command(command: str, game: 'ZorkGame', **kwargs) -> 'SomeAction':
                 tokens = command.split()
                 verb = tokens[0]
                 direct_object = tokens[1] if len(tokens) > 1 else None
@@ -53,8 +54,10 @@ class BaseAction:
         """
         if not self.direct_object:
             return True  # No direct object to validate
-        if not self.game.find_item(self.direct_object):
-            print(f"I don't see any {self.direct_object} here.")
+
+        direct_obj: str = self.direct_object
+        if not self.game.find_item(direct_obj):
+            print(f"I don't see any {direct_obj} here.")
             return False
         return True
 
@@ -62,8 +65,10 @@ class BaseAction:
         """Confirm presence of indirect object"""
         if not self.indirect_object:
             return True  # No indirect object to validate
-        if not self.game.find_item(self.indirect_object):
-            print(f"I don't see any {self.indirect_object} here.")
+
+        indirect_obj: str = self.indirect_object
+        if not self.game.find_item(indirect_obj):
+            print(f"I don't see any {indirect_obj} here.")
             return False
         return True
 
@@ -94,7 +99,7 @@ class TurnOnOffAction(BaseAction):
         self.turn_on = turn_on
 
     @staticmethod
-    def from_command(command: str, game: 'ZorkGame', turn_on: bool) -> 'TurnOnOffAction':
+    def from_command(command: str, game: 'ZorkGame', turn_on: bool) -> 'TurnOnOffAction':  # type: ignore[override]
         """Factory method to create TurnOnOffAction from command
 
         Args:
@@ -121,9 +126,10 @@ class TurnOnOffAction(BaseAction):
             print(f"Turn {'on' if self.turn_on else 'off'} what?")
             return False
 
-        item = self.game.find_item(self.direct_object)
+        direct_obj: str = self.direct_object
+        item = self.game.find_item(direct_obj)
         if not item:
-            print(f"I don't see any {self.direct_object} here.")
+            print(f"I don't see any {direct_obj} here.")
             return False
 
         if 'LIGHTBIT' not in item.flags:
@@ -134,7 +140,10 @@ class TurnOnOffAction(BaseAction):
 
     def effect(self):
         """Toggle the light source and update room lighting"""
-        item = self.game.find_item(self.direct_object)
+        assert self.direct_object is not None, "Direct object required"
+        direct_obj: str = self.direct_object
+        item = self.game.find_item(direct_obj)
+        assert item is not None, "Item should exist after validation"
         is_on = 'ONBIT' in item.flags
 
         if self.turn_on:
@@ -200,31 +209,33 @@ class TakeAction(BaseAction):
                 print("Take what?")
             return False
 
+        direct_obj: str = self.direct_object
         # If taking from container, find item in container
         if self.indirect_object:
             # Container validation happens in validate_indirect_object
             # Here we just check if item exists in the container
-            container = self.game.find_item(self.indirect_object)
+            indirect_obj: str = self.indirect_object
+            container = self.game.find_item(indirect_obj)
             if not container:
                 return False  # Error already printed in validate_indirect_object
 
             # Find item in container
             item = None
             for item_name, potential_item in self.game.items.items():
-                if potential_item.location == container.name and potential_item.matches(self.direct_object):
+                if potential_item.location == container.name and potential_item.matches(direct_obj):
                     item = potential_item
                     break
 
             if not item:
-                print(f"There's no {self.direct_object} in the {container.desc}.")
+                print(f"There's no {direct_obj} in the {container.desc}.")
                 return False
 
             return True
         else:
             # Simple take - find item in room or inventory
-            item = self.game.find_item(self.direct_object)
+            item = self.game.find_item(direct_obj)
             if not item:
-                print(f"I don't see any {self.direct_object} here.")
+                print(f"I don't see any {direct_obj} here.")
                 return False
 
             # Check if takeable
@@ -244,9 +255,10 @@ class TakeAction(BaseAction):
         if not self.indirect_object:
             return True  # No container specified
 
-        container = self.game.find_item(self.indirect_object)
+        indirect_obj: str = self.indirect_object
+        container = self.game.find_item(indirect_obj)
         if not container:
-            print(f"You don't see any {self.indirect_object} here.")
+            print(f"You don't see any {indirect_obj} here.")
             return False
 
         if 'CONTBIT' not in container.flags:
@@ -257,14 +269,18 @@ class TakeAction(BaseAction):
 
     def effect(self):
         """Take the item and add to inventory"""
-        item = self.game.find_item(self.direct_object)
+        assert self.direct_object is not None, "Direct object required"
+        direct_obj: str = self.direct_object
+        item = self.game.find_item(direct_obj)
+        assert item is not None, "Item should exist after validation"
 
         if self.indirect_object:
             # Taking from container
             container = self.game.find_item(self.indirect_object)
+            assert container is not None, "Container should exist after validation"
             # Find the actual item in container (by location)
             for item_name, potential_item in self.game.items.items():
-                if potential_item.location == container.name and potential_item.matches(self.direct_object):
+                if potential_item.location == container.name and potential_item.matches(self.direct_object or ""):
                     item = potential_item
                     break
 
@@ -325,10 +341,11 @@ class DropAction(BaseAction):
                 print("Drop what?")
             return False
 
-        item = self.game.find_item(self.direct_object)
+        direct_obj: str = self.direct_object
+        item = self.game.find_item(direct_obj)
         if not item:
             if self.indirect_object:
-                print(f"You don't see any {self.direct_object} here.")
+                print(f"You don't see any {direct_obj} here.")
             else:
                 print(f"You don't have that.")
             return False
@@ -345,25 +362,30 @@ class DropAction(BaseAction):
         if not self.indirect_object:
             return True  # No container specified
 
-        container = self.game.find_item(self.indirect_object)
+        indirect_obj: str = self.indirect_object
+        container = self.game.find_item(indirect_obj)
         if not container:
-            print(f"You don't see any {self.indirect_object} here.")
+            print(f"You don't see any {indirect_obj} here.")
             return False
 
         if 'CONTBIT' not in container.flags:
-            print(f"You can't put things in the {container.desc}.")
+            print(f"The {container.desc} isn't a container.")
             return False
 
         return True
 
     def effect(self):
         """Drop the item in room or container"""
-        item = self.game.find_item(self.direct_object)
+        assert self.direct_object is not None, "Direct object required"
+        direct_obj: str = self.direct_object
+        item = self.game.find_item(direct_obj)
+        assert item is not None, "Item should exist after validation"
         self.game.state.remove_item(item.name)
 
         if self.indirect_object:
             # Putting in container
             container = self.game.find_item(self.indirect_object)
+            assert container is not None, "Container should exist after validation"
             item.location = container.name
 
             # Trophy case scoring
@@ -415,11 +437,12 @@ class SingleObjectAction(BaseAction):
                 return False
             return True  # Some actions have default behavior when no object
 
-        item = self.game.find_item(self.direct_object)
+        direct_obj: str = self.direct_object
+        item = self.game.find_item(direct_obj)
         if not item:
             if self.allow_missing:
                 return True  # Subclass will handle missing object
-            print(f"You don't see any {self.direct_object} here.")
+            print(f"You don't see any {direct_obj} here.")
             return False
 
         return True
@@ -461,9 +484,10 @@ class TwoObjectAction(BaseAction):
                 return False
             return True
 
-        item = self.game.find_item(self.direct_object)
+        direct_obj: str = self.direct_object
+        item = self.game.find_item(direct_obj)
         if not item:
-            print(f"You don't see any {self.direct_object} here.")
+            print(f"You don't see any {direct_obj} here.")
             return False
 
         return True
@@ -476,9 +500,10 @@ class TwoObjectAction(BaseAction):
                 return False
             return True
 
-        item = self.game.find_item(self.indirect_object)
+        indirect_obj: str = self.indirect_object
+        item = self.game.find_item(indirect_obj)
         if not item:
-            print(f"You don't see any {self.indirect_object} here.")
+            print(f"You don't see any {indirect_obj} here.")
             return False
 
         return True
@@ -634,8 +659,13 @@ class GiveAction(TwoObjectAction):
 
     def effect(self):
         """Give the item to the NPC"""
-        item = self.game.find_item(self.direct_object)
-        target = self.game.find_item(self.indirect_object)
+        assert self.direct_object is not None and self.indirect_object is not None, "Objects required"
+        direct_obj: str = self.direct_object
+        indirect_obj: str = self.indirect_object
+        item = self.game.find_item(direct_obj)
+        assert item is not None, "Item should exist after validation"
+        target = self.game.find_item(indirect_obj)
+        assert target is not None, "Target should exist after validation"
 
         # Default behavior - NPC refuses (can be overridden for specific NPCs later)
         print(f"The {target.desc} refuses it politely.")
@@ -708,7 +738,10 @@ class AttackAction(TwoObjectAction):
         """Perform the attack"""
         import random
 
-        target = self.game.find_item(self.direct_object)
+        assert self.direct_object is not None, "Direct object required"
+        direct_obj: str = self.direct_object
+        target = self.game.find_item(direct_obj)
+        assert target is not None, "Target should exist after validation"
         weapon = self.game.find_item(self.indirect_object) if self.indirect_object else None
 
         # Handle troll specifically
@@ -811,11 +844,15 @@ class ThrowAction(TwoObjectAction):
 
     def effect(self):
         """Throw the item"""
-        item = self.game.find_item(self.direct_object)
+        assert self.direct_object is not None, "Direct object required"
+        direct_obj: str = self.direct_object
+        item = self.game.find_item(direct_obj)
+        assert item is not None, "Item should exist after validation"
 
         if self.indirect_object:
             # Throwing at target
             target = self.game.find_item(self.indirect_object)
+            assert target is not None, "Target should exist after validation"
             print(f"You throw the {item.desc} at the {target.desc}.")
             print("It bounces harmlessly off.")
         else:
@@ -857,7 +894,10 @@ class ClimbAction(SingleObjectAction):
 
     def effect(self):
         """Climb the object"""
-        item = self.game.find_item(self.direct_object)
+        assert self.direct_object is not None, "Direct object required"
+        direct_obj: str = self.direct_object
+        item = self.game.find_item(direct_obj)
+        assert item is not None, "Item should exist after validation"
 
         # Special case for tree in forest path
         if item.name == 'tree' and self.game.state.current_room == 'path':
@@ -896,7 +936,10 @@ class MoveAction(SingleObjectAction):
 
     def effect(self):
         """Move the object"""
-        item = self.game.find_item(self.direct_object)
+        assert self.direct_object is not None, "Direct object required"
+        direct_obj: str = self.direct_object
+        item = self.game.find_item(direct_obj)
+        assert item is not None, "Item should exist after validation"
 
         # Special case for rug - reveals trap door
         if item.name == 'rug':
@@ -916,7 +959,7 @@ class OpenCloseAction(BaseAction):
         self.is_opening = is_opening
 
     @staticmethod
-    def from_command(command: str, game: 'ZorkGame', is_opening: bool) -> 'OpenCloseAction':
+    def from_command(command: str, game: 'ZorkGame', is_opening: bool) -> 'OpenCloseAction':  # type: ignore[override]
         """Factory method to create OpenCloseAction from command"""
         tokens = command.split()
         direct_object = ' '.join(tokens[1:]) if len(tokens) > 1 else None
@@ -930,10 +973,10 @@ class OpenCloseAction(BaseAction):
             return False
 
         # Special case: window can be referenced without being a found item
-        if 'window' in self.direct_object:
+        if self.direct_object and 'window' in self.direct_object:
             return True
 
-        item = self.game.find_item(self.direct_object)
+        item = self.game.find_item(self.direct_object or "")
         if not item:
             print(f"{'I don' if self.is_opening else 'You don'}\'t see any {self.direct_object} here.")
             return False
@@ -942,10 +985,10 @@ class OpenCloseAction(BaseAction):
 
     def effect(self):
         """Open or close the object"""
-        item = self.game.find_item(self.direct_object)
+        item = self.game.find_item(self.direct_object or "")
 
         # Special case: Kitchen window (at east_of_house or in kitchen)
-        if 'window' in self.direct_object:
+        if self.direct_object and 'window' in self.direct_object:
             if self.is_opening:
                 # Opening window
                 if self.game.state.current_room == 'east_of_house' or (item and 'window' in item.synonyms):
